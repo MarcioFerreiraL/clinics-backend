@@ -49,6 +49,7 @@ class SecurityConfig {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/auth/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/clinics/*/reviews/me").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/exams/**", "/api/v1/exam-types/**", "/api/v1/clinics/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/exams/*/contacts").permitAll()
                         .requestMatchers(HttpMethod.GET, "/files/**").permitAll()
