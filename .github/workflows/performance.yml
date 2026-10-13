@@ -1,0 +1,42 @@
+name: Testes de carga
+
+on:
+  workflow_dispatch:
+    inputs:
+      cenario:
+        description: Cenário extra (além de smoke e load)
+        type: choice
+        options: [nenhum, stress, spike, soak]
+        default: nenhum
+  schedule:
+    - cron: '0 6 * * 1' # segundas, 03:00 (Brasília)
+
+jobs:
+  carga:
+    name: k6 contra o ambiente espelho da produção
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construir a imagem e subir o ambiente de carga
+        run: |
+          docker build -t clinics-api:latest .
+          docker compose -f loadtest/compose.loadtest.yaml -p clinicsload up -d
+          for i in $(seq 1 40); do curl -fs localhost:8091/actuator/health | grep -q UP && break; sleep 4; done
+      - name: Smoke
+        run: loadtest/run.sh smoke
+      - name: Carga nominal (limites: RNF03, busca p95 < 300 ms)
+        run: loadtest/run.sh load
+      - name: Cenário extra
+        if: github.event.inputs.cenario != '' && github.event.inputs.cenario != 'nenhum'
+        run: loadtest/run.sh ${{ github.event.inputs.cenario }}
+      - name: Guardar resultados
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultados-k6
+          path: loadtest/results/
+          retention-days: 30
+      - name: Logs da API se algo falhou
+        if: failure()
+        run: docker compose -f loadtest/compose.loadtest.yaml -p clinicsload logs api | tail -80
