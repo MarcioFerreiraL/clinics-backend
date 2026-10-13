@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -64,5 +65,24 @@ class OpenApiIntegrationTest {
     @Test
     void swaggerUiIsServed() throws Exception {
         mvc.perform(get("/swagger-ui/index.html")).andExpect(status().isOk());
+    }
+
+    @Test
+    void rootRedirectsToTheInteractiveDocumentation() throws Exception {
+        mvc.perform(get("/"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(header().string("Location", org.hamcrest.Matchers.endsWith("/swagger-ui/index.html")));
+    }
+
+    @Test
+    void rootIsNotListedInTheContract() throws Exception {
+        mvc.perform(get("/v3/api-docs")).andExpect(jsonPath("$.paths['/']").doesNotExist());
+    }
+
+    @Test
+    void behindTheProxyTheSwaggerUsesTheForwardedHostAndProtocol() throws Exception {
+        mvc.perform(get("/v3/api-docs").header("X-Forwarded-Proto", "https").header("X-Forwarded-Host", "clinics.marciodev.com"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.servers[0].url").value("https://clinics.marciodev.com"));
     }
 }

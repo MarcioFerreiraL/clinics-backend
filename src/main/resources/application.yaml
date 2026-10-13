@@ -25,6 +25,8 @@ spring:
 
 server:
   port: ${PORT:8080}
+  # Atrás do Cloudflare Tunnel: respeita X-Forwarded-Proto/Host, para o Swagger usar https e o domínio certo.
+  forward-headers-strategy: framework
   error:
     include-message: never
     include-stacktrace: never
