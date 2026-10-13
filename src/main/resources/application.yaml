@@ -15,9 +15,6 @@ spring:
           time_zone: UTC
   flyway:
     enabled: true
-  docker:
-    compose:
-      enabled: false
   jackson:
     default-property-inclusion: non_null
 
