@@ -1,0 +1,190 @@
+# 08 · Diagramas de Sequência
+
+Os fluxos abaixo mostram como uma requisição atravessa as camadas hexagonais (`web` → `application` → `domain` → `infrastructure`). Cada diagrama corresponde ao código real.
+
+## 1. Cadastro e login (UC01, UC02)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor P as Paciente (app)
+    participant C as AuthController
+    participant S as RegisterUserService
+    participant D as Phone / PasswordPolicy (domínio)
+    participant R as UserRepository (JPA)
+    participant H as BcryptPasswordHasher
+    participant T as JwtTokenIssuer
+
+    P->>C: POST /auth/register {full_name, phone, password}
+    C->>C: Bean Validation (campos obrigatórios)
+    C->>S: register(command)
+    S->>D: Phone.of(raw) e PasswordPolicy.validate()
+    D-->>S: telefone normalizado (5581...) ou ValidationException
+    S->>R: existsByPhone(phone)
+    alt telefone já cadastrado
+        S-->>C: ConflictException PHONE_ALREADY_REGISTERED
+        C-->>P: 409 problem+json
+    else telefone livre
+        S->>H: hash(password) — BCrypt custo 10
+        S->>R: save(User.register(...) com papel PATIENT)
+        S->>T: issue(user) — sub, role, exp
+        S-->>C: AuthResult
+        C-->>P: 201 {token, user}
+    end
+```
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor P as Paciente (app)
+    participant C as AuthController
+    participant S as AuthenticateService
+    participant R as UserRepository
+    participant H as PasswordHasher
+    participant T as TokenIssuer
+
+    P->>C: POST /auth/login {phone, password}
+    C->>S: authenticate(command)
+    S->>R: findByPhone(phone)
+    Note over S,H: Se o telefone não existe, compara com um hash descartável<br/>para igualar o tempo de resposta (RN06)
+    S->>H: matches(password, hash)
+    alt credenciais inválidas
+        S-->>C: AuthenticationFailedException
+        C-->>P: 401 INVALID_CREDENTIALS (mesma resposta para os dois casos)
+    else válidas
+        S->>T: issue(user)
+        C-->>P: 200 {token, user}
+    end
+```
+
+## 2. Acesso a uma rota protegida (JWT)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor P as Paciente (app)
+    participant F as Filtro OAuth2 Resource Server
+    participant C as MeController
+    participant S as ManageProfileService
+    participant R as UserRepository
+
+    P->>F: GET /me — Authorization: Bearer <token>
+    F->>F: valida assinatura HS256 e expiração
+    alt token ausente, inválido ou expirado
+        F-->>P: 401 UNAUTHENTICATED (problem+json)
+    else token válido
+        F->>C: Jwt (sub = id do usuário, role)
+        C->>S: getProfile(UUID.fromString(sub))
+        Note over C,S: O id vem sempre do token,<br/>nunca da URL ou do corpo (RN35)
+        S->>R: findById(id)
+        C-->>P: 200 perfil
+    end
+```
+
+## 3. Buscar e comparar exames (UC03)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor P as Paciente (app)
+    participant C as ExamController
+    participant S as SearchExamsService
+    participant R as ExamOfferRepository (SQL)
+    participant D as ExamOffer / ExamSort / GeoPoint (domínio)
+
+    P->>C: GET /exams/search?query&category&sort_by&lat&lng
+    C->>S: search(query)
+    S->>D: ExamCategory.parse(), ExamSort.parse(), new GeoPoint(lat,lng)
+    D-->>S: valida; sort=distance sem lat/lng → LOCATION_REQUIRED (400)
+    S->>R: findAvailable(texto, categoria)
+    Note over R: Uma consulta: funções de janela calculam<br/>AVG e MIN por tipo de exame; unaccent na busca
+    R-->>S: ofertas com average_price e min_price
+    loop para cada oferta
+        S->>D: distanceKmFrom(origem) — Haversine
+    end
+    S->>D: ordena com ExamSort.comparator()
+    S->>S: pagina em memória (size ≤ 50)
+    S-->>C: PageResult
+    C-->>P: 200 {total, data[{price, average_price, savings, best_price, distance_km}]}
+```
+
+## 4. Contato por WhatsApp e economia (UC07, UC08)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor P as Paciente (app)
+    participant C as ContactController
+    participant S as RegisterContactService
+    participant L as CatalogContactableExamLookup
+    participant K as GetExamDetailsUseCase (catálogo)
+    participant W as WhatsAppLinkBuilder (domínio)
+    participant E as ContactEventRepository
+
+    P->>C: POST /exams/{id}/contacts (token opcional)
+    C->>C: userId = sub do JWT, ou null para visitante
+    C->>S: register(examId, userId)
+    S->>L: findById(examId)
+    L->>K: getById(examId) — porta pública do catálogo
+    K-->>L: oferta (preço, economia, WhatsApp)
+    L-->>S: ContactableExam (vocabulário do módulo engagement)
+    S->>W: build(whatsapp, nome, preço)
+    W-->>S: https://wa.me/55...?text=<mensagem codificada>
+    S->>E: save(ContactEvent com preço e economia congelados)
+    C-->>P: 201 {contact_id, whatsapp_url, estimated_savings}
+    Note over P: O app abre o link com url_launcher
+    P->>C: GET /me/savings
+    C-->>P: {total_savings: soma dos estimated_savings do usuário}
+```
+
+## 5. Avaliar clínica (UC10)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor P as Paciente (app)
+    participant C as ReviewController
+    participant S as ReviewClinicService
+    participant D as Review / RatingStats (domínio)
+    participant R as ReviewRepository (SQL)
+
+    P->>C: PUT /clinics/{id}/reviews/me {rating, comment}
+    C->>S: submit(userId, clinicId, rating, comment)
+    Note over S,R: Tudo em uma única transação
+    S->>R: clinicExists(id)
+    S->>R: findByUserAndClinic(userId, clinicId)
+    alt já avaliou
+        S->>D: review.edit(rating, comment) — substitui
+    else primeira avaliação
+        S->>D: Review.create(...) — valida nota 1..5 e comentário ≤ 1000
+    end
+    S->>R: save(review) — INSERT ... ON CONFLICT (user, clínica) DO UPDATE
+    S->>R: statsFor(clinicId) → soma e contagem
+    S->>D: RatingStats.average() — 1 casa decimal, HALF_UP
+    S->>R: updateClinicRating(clinicId, stats)
+    S-->>C: SubmitResult(review, created)
+    C-->>P: 201 se criou, 200 se substituiu
+```
+
+## 6. Atualizar foto de perfil (UC11)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor P as Paciente (app)
+    participant C as MeController
+    participant S as ManageProfileService
+    participant D as AvatarImage (domínio)
+    participant A as LocalAvatarStorage
+    participant R as UserRepository
+
+    P->>C: PUT /me/avatar (multipart, parte "file")
+    C->>S: changeAvatar(userId, bytes)
+    S->>D: AvatarImage.of(bytes)
+    Note over D: Detecta PNG/JPEG pelos bytes iniciais<br/>e rejeita arquivos > 2 MB (RN34)
+    D-->>S: imagem válida ou INVALID_AVATAR (400)
+    S->>A: save(userId, image) → /files/avatars/<id>-<rand>.png
+    S->>R: save(user com novo avatar_url)
+    S->>A: delete(foto anterior)
+    C-->>P: 200 perfil com avatar_url
+```
