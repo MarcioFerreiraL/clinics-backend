@@ -12,6 +12,7 @@ IMAGE="clinics-api:latest"
 
 ssh_run() { ssh "${SSH_OPTS[@]}" "$TARGET" "$@"; }
 
+[ -d src/main/resources/static/app ] || echo "AVISO: o app web (PWA) não está embutido. Rode deploy/build-web.sh antes para publicar /app/."
 echo "==> Construindo a imagem"
 docker build -t "$IMAGE" .
 

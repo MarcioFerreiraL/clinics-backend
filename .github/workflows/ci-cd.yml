@@ -65,6 +65,19 @@ jobs:
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
+      # O site serve o app web (PWA) em /app/: compila a partir do repositório do app e embute na imagem.
+      - uses: actions/checkout@v4
+        with:
+          repository: MarcioFerreiraL/clinics-mobile
+          ref: develop
+          path: clinics-mobile
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.4'
+          channel: stable
+          cache: true
+      - name: Gerar o app web (PWA)
+        run: deploy/build-web.sh clinics-mobile/clinics https://clinics.marciodev.com
       - name: Preparar a chave SSH
         run: |
           install -m 700 -d ~/.ssh
