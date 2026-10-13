@@ -1,12 +1,17 @@
 package br.com.clinics.catalog.infrastructure.web;
 
+import java.util.UUID;
+
+import br.com.clinics.catalog.application.port.in.GetExamDetailsUseCase;
 import br.com.clinics.catalog.application.port.in.SearchExamsUseCase;
 import br.com.clinics.catalog.application.port.in.SearchExamsUseCase.SearchExamsQuery;
+import br.com.clinics.catalog.infrastructure.web.ExamDtos.ExamDetailResponse;
 import br.com.clinics.catalog.infrastructure.web.ExamDtos.SearchResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -17,9 +22,11 @@ import org.springframework.web.bind.annotation.RestController;
 class ExamController {
 
     private final SearchExamsUseCase search;
+    private final GetExamDetailsUseCase details;
 
-    ExamController(SearchExamsUseCase search) {
+    ExamController(SearchExamsUseCase search, GetExamDetailsUseCase details) {
         this.search = search;
+        this.details = details;
     }
 
     @GetMapping("/search")
@@ -33,5 +40,12 @@ class ExamController {
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size) {
         return SearchResponse.from(search.search(new SearchExamsQuery(query, category, sortBy, lat, lng, page, size)));
+    }
+
+    @GetMapping("/{id}")
+    @Operation(summary = "Detalhes de uma oferta de exame (UC04)")
+    ExamDetailResponse details(@PathVariable UUID id, @RequestParam(required = false) Double lat,
+            @RequestParam(required = false) Double lng) {
+        return ExamDetailResponse.from(details.getById(id, lat, lng));
     }
 }
