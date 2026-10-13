@@ -41,6 +41,19 @@ A API **não abre porta para a internet**. No `compose.prod.yaml` ela publica s�
 
 > Cuidado: o Docker ignora o `ufw` ao publicar portas. Por isso a porta é ligada em `127.0.0.1`; nunca use `8080:8080` sem o prefixo.
 
+## Site público e download do app
+
+A raiz `https://clinics.marciodev.com/` é uma página de download (arquivo `src/main/resources/static/index.html`):
+
+| Rota | O que serve |
+|---|---|
+| `/` | Página de download: APK do Android, PWA no iPhone e link da documentação |
+| `/app/` | App web (PWA), gerado pelo Flutter e embutido na imagem |
+| `/docs` | Redireciona para a documentação OpenAPI (Swagger UI) |
+| `/api/v1/...` | A API |
+
+O app web **não é versionado** aqui: o job de deploy faz checkout do repositório do app, roda `deploy/build-web.sh` e a imagem já sai com `/app/`. Para um deploy manual, rode `deploy/build-web.sh` antes de `deploy/deploy.sh`. O APK vem da release `app-latest` do repositório do app (veja `docs/DISTRIBUICAO.md` lá).
+
 ## Deploy manual
 
 ```bash
