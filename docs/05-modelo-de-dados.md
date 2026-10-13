@@ -258,6 +258,21 @@ GROUP BY t.id, t.name ORDER BY contacts DESC LIMIT 5;
 
 O modelo está na **3ª forma normal**, com uma desnormalização deliberada (D6). Atributos da oferta (`price`, `preparation`) dependem da chave `(clinic, tipo)`, e atributos do tipo (`name`, `category`) dependem só do tipo, o que elimina a repetição do nome do exame em cada clínica.
 
-## 8. Tabelas da Entrega 3 (não criar agora)
+## 8. Migrações implementadas
+
+| Versão | Arquivo | Conteúdo |
+|---|---|---|
+| V1 | `V1__create_users.sql` | Extensão `unaccent`, tabela `users`, índice único de e-mail sem caixa |
+| V2 | `V2__create_clinics.sql` | `clinics`, `clinic_operating_hours` |
+| V3 | `V3__create_exam_types_and_exams.sql` | `exam_types`, `exams` (oferta) e índices de comparação |
+| V4 | `V4__create_engagement_tables.sql` | `favorites`, `reviews`, `price_history`, `contact_events` |
+| V5 | `V5__seed_demo_data.sql` | 6 clínicas, horários, 18 tipos de exame, 31 ofertas, histórico de preço e contatos de exemplo |
+| V6 | `V6__seed_demo_reviews.sql` | 5 pacientes de demonstração (sem login) e 21 avaliações; recalcula `rating` e `review_count` das clínicas |
+
+O banco tem **9 tabelas de domínio**: `users`, `clinics`, `clinic_operating_hours`, `exam_types`, `exams`, `favorites`, `reviews`, `price_history` e `contact_events`. As colunas e restrições do esquema real seguem o modelo lógico da seção 3, com duas particularidades: `reviews` ganhou `updated_at` (reavaliar altera a data) e `exams` não tem contador de visualizações (o "em alta" usa contatos).
+
+`price_history` recebe uma linha por oferta no seed, mas nenhuma funcionalidade do paciente altera preços. O registro automático em cada mudança (RN13) entra junto com a visão da clínica.
+
+## 9. Tabelas da Entrega 3 (não criar agora)
 
 `refresh_tokens`, `password_reset_tokens`, `search_history`, `consents`.
