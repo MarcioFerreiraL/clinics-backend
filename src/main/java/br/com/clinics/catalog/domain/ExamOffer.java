@@ -25,7 +25,16 @@ public record ExamOffer(
         BigDecimal averagePrice,
         BigDecimal minPrice,
         String preparation,
-        String paymentMethods) {
+        String paymentMethods,
+        String examDescription) {
+
+    public ExamOffer(UUID examId, UUID examTypeId, String examName, ExamCategory category, UUID clinicId,
+            String clinicName, String neighborhood, GeoPoint clinicLocation, BigDecimal clinicRating,
+            boolean clinicVerified, String whatsappNumber, String logoUrl, BigDecimal price, BigDecimal averagePrice,
+            BigDecimal minPrice, String preparation, String paymentMethods) {
+        this(examId, examTypeId, examName, category, clinicId, clinicName, neighborhood, clinicLocation, clinicRating,
+                clinicVerified, whatsappNumber, logoUrl, price, averagePrice, minPrice, preparation, paymentMethods, null);
+    }
 
     /** RN15: economia em relação à média local, nunca negativa. */
     public BigDecimal savings() {
