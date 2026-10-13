@@ -24,7 +24,7 @@ class SearchExamsIntegrationTest {
         mvc.perform(get("/api/v1/exams/search").param("query", "ultrassom abdominal"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.total").value(5))
-                .andExpect(jsonPath("$.data[0].clinic.name").value("Clínica Santa Maria"))
+                .andExpect(jsonPath("$.data[0].clinic.name").value("Clínica Santa Mariazinha"))
                 .andExpect(jsonPath("$.data[0].price").value(90.00))
                 .andExpect(jsonPath("$.data[0].average_price").value(118.00))
                 .andExpect(jsonPath("$.data[0].savings").value(28.00))
@@ -70,7 +70,7 @@ class SearchExamsIntegrationTest {
                         .param("lat", LAT).param("lng", LNG))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].distance_km").isNumber())
-                .andExpect(jsonPath("$.data[0].clinic.name").value("Clínica Santa Maria"));
+                .andExpect(jsonPath("$.data[0].clinic.name").value("Clínica Santa Mariazinha"));
     }
 
     @Test
@@ -109,5 +109,58 @@ class SearchExamsIntegrationTest {
                 .andExpect(jsonPath("$.total_pages").value(16));
         mvc.perform(get("/api/v1/exams/search").param("size", "1000"))
                 .andExpect(jsonPath("$.size").value(50));
+    }
+
+    @Test
+    void filtersByNeighborhoodIgnoringCaseAndAccents() throws Exception {
+        mvc.perform(get("/api/v1/exams/search").param("query", "ultrassom abdominal").param("neighborhood", "SAO JOSE"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(1))
+                .andExpect(jsonPath("$.data[0].clinic.neighborhood").value("São José"));
+    }
+
+    @Test
+    void filtersByPriceRange() throws Exception {
+        mvc.perform(get("/api/v1/exams/search").param("query", "ultrassom abdominal")
+                        .param("min_price", "100").param("max_price", "120"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[*].price").value(org.hamcrest.Matchers.everyItem(
+                        org.hamcrest.Matchers.allOf(org.hamcrest.Matchers.greaterThanOrEqualTo(100.0),
+                                org.hamcrest.Matchers.lessThanOrEqualTo(120.0)))));
+    }
+
+    @Test
+    void filtersByMinimumClinicRating() throws Exception {
+        mvc.perform(get("/api/v1/exams/search").param("min_rating", "4.8").param("size", "50"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[*].clinic.rating").value(org.hamcrest.Matchers.everyItem(
+                        org.hamcrest.Matchers.greaterThanOrEqualTo(4.8))));
+    }
+
+    @Test
+    void bestPriceOnlyKeepsTheCheapestOfferOfEachExam() throws Exception {
+        mvc.perform(get("/api/v1/exams/search").param("query", "ultrassom abdominal").param("best_price_only", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(1))
+                .andExpect(jsonPath("$.data[0].best_price").value(true));
+    }
+
+    @Test
+    void rejectsInvalidFilters() throws Exception {
+        mvc.perform(get("/api/v1/exams/search").param("min_price", "200").param("max_price", "100"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_PRICE_RANGE"));
+        mvc.perform(get("/api/v1/exams/search").param("min_rating", "6"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_MIN_RATING"));
+    }
+
+    @Test
+    void listsNeighborhoodsPublicly() throws Exception {
+        mvc.perform(get("/api/v1/neighborhoods"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].name").value(org.hamcrest.Matchers.hasItems(
+                        "Bairro Novo", "Centro", "Cohab", "Santa Rita", "São José")))
+                .andExpect(jsonPath("$[?(@.name=='Centro')].clinics_count").value(2));
     }
 }

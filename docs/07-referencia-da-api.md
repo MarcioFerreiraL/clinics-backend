@@ -26,6 +26,7 @@ A versão interativa fica em `/swagger-ui.html` e o contrato em `/v3/api-docs`.
 | UC01 | `POST /auth/register` | 🌐 | 201 | Cadastra paciente e já devolve o token |
 | UC02 | `POST /auth/login` | 🌐 | 200 | Autentica com telefone e senha |
 | UC03 | `GET /exams/search` | 🌐 | 200 | Busca e compara ofertas |
+| UC13 | `GET /neighborhoods` | 🌐 | 200 | Bairros com clínicas |
 | UC04 | `GET /exams/{id}` | 🌐 | 200 | Detalhes da oferta e da clínica |
 | UC05 | `GET /clinics/{id}` | 🌐 | 200 | Perfil público, horários e exames |
 | UC06 | `GET /exam-types/trending` | 🌐 | 200 | Exames em alta na semana |
@@ -77,6 +78,10 @@ O token tem as claims `sub` (id do usuário), `role`, `iat` e `exp`.
 | `category` | texto | `Sangue`, `Raio-X`, `Consultas`, `Cardio` ou `Ultrassom` |
 | `sort_by` | texto | `price` (padrão), `rating`, `name` ou `distance` |
 | `lat`, `lng` | decimal | Obrigatórios com `sort_by=distance`; sempre juntos. Não são armazenados (RN20) |
+| `neighborhood` | texto | Bairro da clínica; ignora caixa e acentos |
+| `min_price`, `max_price` | decimal | Faixa de preço em reais |
+| `min_rating` | decimal | Nota mínima da clínica (0 a 5) |
+| `best_price_only` | booleano | Só as ofertas de menor preço de cada exame |
 | `page`, `size` | inteiro | Paginação |
 
 ```json
@@ -87,7 +92,7 @@ O token tem as claims `sub` (id do usuário), `role`, `iat` e `exp`.
     {
       "id": "cf5956f8-27c6-48d5-b66e-14f06d50fc85",
       "exam_type": { "id": "e2efd2c4-...", "name": "Ultrassom Abdominal Total", "category": "Ultrassom" },
-      "clinic": { "id": "8dc21c45-...", "name": "Clínica Santa Maria", "neighborhood": "Centro",
+      "clinic": { "id": "8dc21c45-...", "name": "Clínica Santa Mariazinha", "neighborhood": "Centro",
                   "rating": 4.8, "is_verified": true, "whatsapp_number": "5581999999999", "logo_url": "https://..." },
       "price": 90.0,
       "average_price": 118.0,
@@ -105,7 +110,13 @@ O token tem as claims `sub` (id do usuário), `role`, `iat` e `exp`.
 - `best_price` marca a oferta de menor preço.
 - `distance_km` só aparece quando `lat` e `lng` são informados e a clínica tem coordenadas.
 
-Erros: `INVALID_CATEGORY`, `INVALID_SORT`, `LOCATION_REQUIRED`, `LOCATION_INCOMPLETE`, `INVALID_COORDINATES`.
+Erros: `INVALID_CATEGORY`, `INVALID_SORT`, `INVALID_PRICE_RANGE`, `INVALID_MIN_RATING`, `LOCATION_REQUIRED`, `LOCATION_INCOMPLETE`, `INVALID_COORDINATES`.
+
+### UC13 · `GET /neighborhoods`
+```json
+[ { "name": "Centro", "clinics_count": 2 }, { "name": "Cohab", "clinics_count": 1 } ]
+```
+Alimenta o seletor de bairro do app. Ordem alfabética, sem acento.
 
 ### UC04 · `GET /exams/{id}` (aceita `lat` e `lng` opcionais)
 ```json
@@ -117,7 +128,7 @@ Erros: `INVALID_CATEGORY`, `INVALID_SORT`, `LOCATION_REQUIRED`, `LOCATION_INCOMP
   "preparation": "Jejum 8h • Laudo em 24h",
   "payment_methods": "Pix à vista ou até 3x no cartão",
   "clinic": {
-    "id": "8dc21c45-...", "name": "Clínica Santa Maria", "address": "Rua João Alfredo, 142",
+    "id": "8dc21c45-...", "name": "Clínica Santa Mariazinha", "address": "Rua João Alfredo, 142",
     "neighborhood": "Centro", "phone_number": "(81) 3634-1122", "whatsapp_number": "5581999999999",
     "rating": 4.8, "review_count": 5, "is_verified": true,
     "latitude": -7.8333, "longitude": -35.7528,
@@ -225,7 +236,7 @@ Resposta 204. Erros: `INVALID_CURRENT_PASSWORD`, `WEAK_PASSWORD`, `SAME_PASSWORD
 
 | Status | Códigos |
 |---|---|
-| 400 | `VALIDATION_ERROR`, `MALFORMED_REQUEST`, `INVALID_PHONE`, `INVALID_CPF`, `WEAK_PASSWORD`, `INVALID_NAME`, `INVALID_EMAIL`, `INVALID_BIRTH_DATE`, `INVALID_AVATAR`, `INVALID_CURRENT_PASSWORD`, `SAME_PASSWORD`, `INVALID_CATEGORY`, `INVALID_SORT`, `LOCATION_REQUIRED`, `LOCATION_INCOMPLETE`, `INVALID_COORDINATES`, `INVALID_RATING`, `COMMENT_TOO_LONG`, `CLINIC_WITHOUT_WHATSAPP` |
+| 400 | `VALIDATION_ERROR`, `MALFORMED_REQUEST`, `INVALID_PHONE`, `INVALID_CPF`, `WEAK_PASSWORD`, `INVALID_NAME`, `INVALID_EMAIL`, `INVALID_BIRTH_DATE`, `INVALID_AVATAR`, `INVALID_CURRENT_PASSWORD`, `SAME_PASSWORD`, `INVALID_CATEGORY`, `INVALID_SORT`, `INVALID_PRICE_RANGE`, `INVALID_MIN_RATING`, `LOCATION_REQUIRED`, `LOCATION_INCOMPLETE`, `INVALID_COORDINATES`, `INVALID_RATING`, `COMMENT_TOO_LONG`, `CLINIC_WITHOUT_WHATSAPP` |
 | 401 | `INVALID_CREDENTIALS` (login), `UNAUTHENTICATED` (token ausente, inválido ou expirado) |
 | 403 | `ACCESS_DENIED` |
 | 404 | `EXAM_NOT_FOUND`, `EXAM_TYPE_NOT_FOUND`, `CLINIC_NOT_FOUND`, `REVIEW_NOT_FOUND`, `USER_NOT_FOUND` |

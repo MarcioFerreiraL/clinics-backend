@@ -11,6 +11,7 @@ import java.util.UUID;
 import br.com.clinics.catalog.application.port.out.ClinicRepository;
 import br.com.clinics.catalog.domain.Clinic;
 import br.com.clinics.catalog.domain.GeoPoint;
+import br.com.clinics.catalog.domain.NeighborhoodSummary;
 import br.com.clinics.catalog.domain.OperatingHours;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
@@ -38,6 +39,16 @@ class ClinicJdbcRepository implements ClinicRepository {
                 .param("id", id)
                 .query((rs, row) -> map(rs, hours))
                 .optional();
+    }
+
+    @Override
+    public List<NeighborhoodSummary> listNeighborhoods() {
+        return jdbc.sql("""
+                        SELECT neighborhood, count(*) AS clinics_count FROM clinics
+                        WHERE neighborhood IS NOT NULL
+                        GROUP BY neighborhood ORDER BY unaccent(lower(neighborhood))""")
+                .query((rs, row) -> new NeighborhoodSummary(rs.getString("neighborhood"), rs.getInt("clinics_count")))
+                .list();
     }
 
     private static Clinic map(ResultSet rs, List<OperatingHours> hours) throws SQLException {

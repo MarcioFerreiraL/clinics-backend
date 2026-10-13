@@ -63,6 +63,7 @@ Cada regra tem um identificador estável (`RN`) para ser citado em código, test
 | RN35 | O usuário só acessa e altera os **próprios** dados. O id vem do token, nunca do corpo ou da URL (previne IDOR). | Segurança |
 | RN36 | Dados sensíveis (hash de senha, token) nunca aparecem em respostas ou logs. | Aplicação |
 | RN37 | O cadastro exige CPF, e-mail e data de nascimento. O CPF é normalizado para 11 dígitos, tem os dígitos verificadores validados, é **único** e não é editável pelo perfil. Aparece formatado só no `GET /me`. | Domínio + índice único parcial |
+| RN38 | A busca aceita filtros combináveis: bairro, faixa de preço, nota mínima da clínica e somente melhor preço. Média e menor preço continuam calculados sobre todas as ofertas do tipo (RN14). A lista de bairros vem das clínicas cadastradas. | Aplicação |
 
 ## Regras reservadas para a Entrega 3
 

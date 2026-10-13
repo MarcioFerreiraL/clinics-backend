@@ -40,7 +40,7 @@ class ContactAndTrendingIntegrationTest {
 
     @Test
     void visitorContactReturnsWhatsappLinkAndStoresEventWithoutUser() throws Exception {
-        UUID id = examId("Clínica Santa Maria", "Ultrassom Abdominal Total");
+        UUID id = examId("Clínica Santa Mariazinha", "Ultrassom Abdominal Total");
 
         String json = mvc.perform(post("/api/v1/exams/{id}/contacts", id))
                 .andExpect(status().isCreated())
@@ -58,7 +58,7 @@ class ContactAndTrendingIntegrationTest {
 
     @Test
     void authenticatedContactLinksTheEventToTheUser() throws Exception {
-        UUID id = examId("Laboratório São José", "Hemograma Completo");
+        UUID id = examId("Laboratório São Zezinho", "Hemograma Completo");
         String token = registerAndGetToken();
 
         String json = mvc.perform(post("/api/v1/exams/{id}/contacts", id).header("Authorization", "Bearer " + token))
@@ -71,7 +71,7 @@ class ContactAndTrendingIntegrationTest {
 
     @Test
     void contactOnTheMostExpensiveOfferSavesNothing() throws Exception {
-        UUID id = examId("Policlínica do Agreste", "Ultrassom Abdominal Total");
+        UUID id = examId("Policlínica do Agrestão", "Ultrassom Abdominal Total");
 
         mvc.perform(post("/api/v1/exams/{id}/contacts", id))
                 .andExpect(status().isCreated())
@@ -103,7 +103,7 @@ class ContactAndTrendingIntegrationTest {
 
     @Test
     void trendingRanksByRecentContacts() throws Exception {
-        UUID target = examId("Cardiocenter Surubim", "MAPA 24 horas");
+        UUID target = examId("Cardiocentro Surubim", "MAPA 24 horas");
         jdbc.update("""
                 INSERT INTO contact_events (exam_id, price_at_contact, estimated_savings, created_at)
                 SELECT ?, 130, 0, now() - interval '1 day' FROM generate_series(1, 500)""", target);
@@ -118,7 +118,7 @@ class ContactAndTrendingIntegrationTest {
 
     @Test
     void contactsOlderThanSevenDaysDoNotCount() throws Exception {
-        UUID target = examId("Cardiocenter Surubim", "Teste Ergométrico");
+        UUID target = examId("Cardiocentro Surubim", "Teste Ergométrico");
         jdbc.update("""
                 INSERT INTO contact_events (exam_id, price_at_contact, estimated_savings, created_at)
                 SELECT ?, 150, 0, now() - interval '10 days' FROM generate_series(1, 500)""", target);

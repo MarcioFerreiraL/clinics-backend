@@ -56,9 +56,9 @@ class SavingsIntegrationTest {
     @Test
     void sumsTheSavingsOfEveryContact() throws Exception {
         TestUser user = TestUsers.register(mvc, mapper);
-        contact(user, examId("Clínica Santa Maria"));
-        contact(user, examId("Clínica Santa Maria"));
-        contact(user, examId("Policlínica do Agreste"));
+        contact(user, examId("Clínica Santa Mariazinha"));
+        contact(user, examId("Clínica Santa Mariazinha"));
+        contact(user, examId("Policlínica do Agrestão"));
 
         mvc.perform(get("/api/v1/me/savings").header("Authorization", user.bearer()))
                 .andExpect(jsonPath("$.total_savings").value(56.00))
@@ -69,9 +69,9 @@ class SavingsIntegrationTest {
     void ignoresVisitorContactsAndOtherUsers() throws Exception {
         TestUser user = TestUsers.register(mvc, mapper);
         TestUser other = TestUsers.register(mvc, mapper);
-        contact(user, examId("Clínica Santa Maria"));
-        contact(null, examId("Clínica Santa Maria"));
-        contact(other, examId("Clínica Santa Maria"));
+        contact(user, examId("Clínica Santa Mariazinha"));
+        contact(null, examId("Clínica Santa Mariazinha"));
+        contact(other, examId("Clínica Santa Mariazinha"));
 
         mvc.perform(get("/api/v1/me/savings").header("Authorization", user.bearer()))
                 .andExpect(jsonPath("$.total_savings").value(28.00))
@@ -81,7 +81,7 @@ class SavingsIntegrationTest {
     @Test
     void savingsAreFrozenWhenThePriceChangesLater() throws Exception {
         TestUser user = TestUsers.register(mvc, mapper);
-        UUID exam = examId("Clínica Santa Maria");
+        UUID exam = examId("Clínica Santa Mariazinha");
         contact(user, exam);
 
         jdbc.update("UPDATE exams SET price = 130 WHERE id = ?", exam);

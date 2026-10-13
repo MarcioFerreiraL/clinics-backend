@@ -1,5 +1,6 @@
 package br.com.clinics.catalog.infrastructure.web;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 import br.com.clinics.catalog.application.port.in.GetExamDetailsUseCase;
@@ -38,8 +39,14 @@ class ExamController {
             @RequestParam(required = false) Double lat,
             @RequestParam(required = false) Double lng,
             @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer size) {
-        return SearchResponse.from(search.search(new SearchExamsQuery(query, category, sortBy, lat, lng, page, size)));
+            @RequestParam(required = false) Integer size,
+            @Parameter(description = "Bairro da clínica; ignora caixa e acentos") @RequestParam(required = false) String neighborhood,
+            @Parameter(description = "Preço mínimo em reais") @RequestParam(name = "min_price", required = false) BigDecimal minPrice,
+            @Parameter(description = "Preço máximo em reais") @RequestParam(name = "max_price", required = false) BigDecimal maxPrice,
+            @Parameter(description = "Nota mínima da clínica, de 0 a 5") @RequestParam(name = "min_rating", required = false) BigDecimal minRating,
+            @Parameter(description = "Somente as ofertas de menor preço") @RequestParam(name = "best_price_only", required = false) Boolean bestPriceOnly) {
+        return SearchResponse.from(search.search(new SearchExamsQuery(query, category, sortBy, lat, lng, page, size,
+                neighborhood, minPrice, maxPrice, minRating, bestPriceOnly)));
     }
 
     @GetMapping("/{id}")

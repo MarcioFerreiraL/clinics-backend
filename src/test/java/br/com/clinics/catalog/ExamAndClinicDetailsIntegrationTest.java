@@ -30,7 +30,7 @@ class ExamAndClinicDetailsIntegrationTest {
 
     @Test
     void showsExamDetailsWithClinicAndComparison() throws Exception {
-        UUID id = examId("Clínica Santa Maria", "Ultrassom Abdominal Total");
+        UUID id = examId("Clínica Santa Mariazinha", "Ultrassom Abdominal Total");
 
         mvc.perform(get("/api/v1/exams/{id}", id))
                 .andExpect(status().isOk())
@@ -41,7 +41,7 @@ class ExamAndClinicDetailsIntegrationTest {
                 .andExpect(jsonPath("$.average_price").value(118.00))
                 .andExpect(jsonPath("$.best_price").value(true))
                 .andExpect(jsonPath("$.preparation").value("Jejum 8h • Laudo em 24h"))
-                .andExpect(jsonPath("$.clinic.name").value("Clínica Santa Maria"))
+                .andExpect(jsonPath("$.clinic.name").value("Clínica Santa Mariazinha"))
                 .andExpect(jsonPath("$.clinic.whatsapp_number").value("5581999999999"))
                 .andExpect(jsonPath("$.clinic.open_now").isBoolean())
                 .andExpect(jsonPath("$.clinic.operating_hours.length()").value(6))
@@ -50,7 +50,7 @@ class ExamAndClinicDetailsIntegrationTest {
 
     @Test
     void includesDistanceWhenLocationIsGiven() throws Exception {
-        UUID id = examId("Clínica Santa Maria", "Ultrassom Abdominal Total");
+        UUID id = examId("Clínica Santa Mariazinha", "Ultrassom Abdominal Total");
 
         mvc.perform(get("/api/v1/exams/{id}", id).param("lat", "-7.8335").param("lng", "-35.7530"))
                 .andExpect(status().isOk())
@@ -66,7 +66,7 @@ class ExamAndClinicDetailsIntegrationTest {
 
     @Test
     void unavailableExamIs404() throws Exception {
-        UUID id = examId("Cardiocenter Surubim", "MAPA 24 horas");
+        UUID id = examId("Cardiocentro Surubim", "MAPA 24 horas");
         jdbc.update("UPDATE exams SET available = FALSE WHERE id = ?", id);
         try {
             mvc.perform(get("/api/v1/exams/{id}", id)).andExpect(status().isNotFound());
@@ -82,9 +82,9 @@ class ExamAndClinicDetailsIntegrationTest {
 
     @Test
     void showsPublicClinicProfileWithExams() throws Exception {
-        mvc.perform(get("/api/v1/clinics/{id}", clinicId("Clínica Santa Maria")))
+        mvc.perform(get("/api/v1/clinics/{id}", clinicId("Clínica Santa Mariazinha")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("Clínica Santa Maria"))
+                .andExpect(jsonPath("$.name").value("Clínica Santa Mariazinha"))
                 .andExpect(jsonPath("$.rating").value(4.8))
                 .andExpect(jsonPath("$.review_count").value(5))
                 .andExpect(jsonPath("$.is_verified").value(true))
