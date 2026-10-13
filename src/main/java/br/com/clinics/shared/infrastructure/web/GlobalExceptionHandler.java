@@ -44,7 +44,7 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException ex,
             HttpHeaders headers, HttpStatusCode status, WebRequest request) {
         List<FieldViolation> violations = ex.getBindingResult().getFieldErrors().stream()
-                .map(error -> new FieldViolation(error.getField(), error.getDefaultMessage()))
+                .map(error -> new FieldViolation(FieldNames.toSnakeCase(error.getField()), error.getDefaultMessage()))
                 .toList();
         ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Há campos inválidos na requisição.");
         problem.setProperty("errors", violations);

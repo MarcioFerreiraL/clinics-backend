@@ -9,6 +9,7 @@ import io.swagger.v3.core.converter.AnnotatedType;
 import io.swagger.v3.core.converter.ModelConverter;
 import io.swagger.v3.core.converter.ModelConverterContext;
 import io.swagger.v3.oas.models.media.Schema;
+import br.com.clinics.shared.infrastructure.web.FieldNames;
 import org.springframework.stereotype.Component;
 
 /**
@@ -39,16 +40,12 @@ class SnakeCaseModelConverter implements ModelConverter {
         Map<String, Schema> properties = schema.getProperties();
         if (properties != null) {
             Map<String, Schema> renamed = new LinkedHashMap<>();
-            properties.forEach((name, value) -> renamed.put(toSnakeCase(name), value));
+            properties.forEach((name, value) -> renamed.put(FieldNames.toSnakeCase(name), value));
             schema.setProperties(renamed);
         }
         List<String> required = schema.getRequired();
         if (required != null) {
-            schema.setRequired(required.stream().map(SnakeCaseModelConverter::toSnakeCase).toList());
+            schema.setRequired(required.stream().map(FieldNames::toSnakeCase).toList());
         }
-    }
-
-    static String toSnakeCase(String name) {
-        return name.replaceAll("([a-z0-9])([A-Z])", "$1_$2").toLowerCase();
     }
 }
