@@ -2,9 +2,12 @@ package br.com.clinics;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.forwardedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -68,10 +71,37 @@ class OpenApiIntegrationTest {
     }
 
     @Test
-    void rootRedirectsToTheInteractiveDocumentation() throws Exception {
-        mvc.perform(get("/"))
+    void rootForwardsToTheDownloadPage() throws Exception {
+        mvc.perform(get("/")).andExpect(status().isOk()).andExpect(forwardedUrl("index.html"));
+    }
+
+    @Test
+    void downloadPageLinksToTheApkThePwaAndTheDocs() throws Exception {
+        String html = new String(new org.springframework.core.io.ClassPathResource("static/index.html")
+                .getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        org.assertj.core.api.Assertions.assertThat(html)
+                .contains("Baixar APK", "releases/download/app-latest/clinics.apk", "href=\"/app/\"", "href=\"/docs\"",
+                        "MárcioDev");
+    }
+
+    @Test
+    void docsRedirectsToTheInteractiveDocumentation() throws Exception {
+        mvc.perform(get("/docs"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(header().string("Location", org.hamcrest.Matchers.endsWith("/swagger-ui/index.html")));
+    }
+
+    @Test
+    void appPathRedirectsToTheTrailingSlashVersion() throws Exception {
+        mvc.perform(get("/app"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(header().string("Location", org.hamcrest.Matchers.endsWith("/app/")));
+    }
+
+    @Test
+    void sitePublicAssetsDoNotRequireAuthentication() throws Exception {
+        mvc.perform(get("/logo.png")).andExpect(status().isOk());
+        mvc.perform(get("/favicon.png")).andExpect(status().isOk());
     }
 
     @Test

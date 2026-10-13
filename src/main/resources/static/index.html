@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clinics · Compare exames em Surubim</title>
+  <meta name="description" content="Compare preços de exames e consultas em clínicas de Surubim-PE e chame a clínica no WhatsApp. Baixe o app para Android ou use no iPhone.">
+  <meta name="theme-color" content="#0284C7">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <style>
+    :root { --blue:#0284C7; --blue-soft:#CDE7F5; --blue-deep:#0B5F8F; --mist:#E0F2FE; --mint:#8FD9B6;
+            --mint-soft:#DDF3E9; --mint-deep:#1B6B4A; --ink:#1E2B3A; --muted:#64748B; --line:#E1EBF3; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color:var(--ink);
+           background:#fff; line-height:1.5; }
+    .wrap { max-width: 920px; margin: 0 auto; padding: 0 20px; }
+    header.hero { background: var(--mist); padding: 48px 0 56px; text-align: center; }
+    .brand { display:inline-flex; align-items:center; gap:10px; font-weight:800; font-size:20px; color:var(--blue); }
+    .brand img { width:36px; height:36px; }
+    h1 { font-size: clamp(28px, 5vw, 44px); line-height:1.15; margin: 28px auto 12px; max-width: 640px; }
+    .lead { color:var(--muted); font-size:18px; max-width: 560px; margin: 0 auto; }
+    .logo-big { width:120px; height:120px; margin-top:8px; }
+    main { padding: 36px 0 12px; }
+    .grid { display:grid; gap:16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+    .card { border:1px solid var(--line); border-radius:16px; padding:22px; background:#fff; display:flex; flex-direction:column; gap:10px; }
+    .card.recommended { border-color: var(--mint); background: var(--mint-soft); }
+    .tag { align-self:flex-start; font-size:12px; font-weight:700; background:var(--mint); color:var(--mint-deep);
+           border-radius:999px; padding:2px 10px; display:none; }
+    .card.recommended .tag { display:inline-block; }
+    .card h2 { margin:0; font-size:20px; }
+    .card p { margin:0; color:var(--muted); font-size:15px; }
+    .btn { display:inline-block; text-align:center; text-decoration:none; font-weight:700; border-radius:12px;
+           padding:13px 18px; background:var(--blue-soft); color:var(--blue-deep); margin-top:auto; }
+    .btn:hover { filter: brightness(.97); }
+    .btn.mint { background: var(--mint); color: var(--mint-deep); }
+    ol { margin:4px 0 0; padding-left:20px; color:var(--muted); font-size:14px; }
+    ol li { margin: 2px 0; }
+    section.features { padding: 28px 0; }
+    section.features h2 { font-size:22px; margin: 0 0 14px; }
+    .feat { display:grid; gap:12px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+    .feat div { background:var(--mist); border-radius:14px; padding:16px; font-size:15px; }
+    .feat b { display:block; color:var(--blue-deep); margin-bottom:4px; }
+    footer { border-top:1px solid var(--line); margin-top:28px; padding: 22px 0 36px; color:var(--muted); font-size:14px;
+             display:flex; flex-wrap:wrap; gap:8px 24px; justify-content:space-between; }
+    footer a { color: var(--blue); text-decoration: none; font-weight:600; }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="wrap">
+      <span class="brand"><img src="/logo.png" alt="">Clinics</span>
+      <h1>Compare o preço do exame e chame a clínica no WhatsApp</h1>
+      <p class="lead">Clínicas e laboratórios de Surubim-PE lado a lado: preço, distância e avaliação.
+        Baixe o app ou use direto no navegador.</p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="grid">
+      <article class="card" id="android">
+        <span class="tag">Recomendado para o seu aparelho</span>
+        <h2>Android</h2>
+        <p>Instale o aplicativo completo, com GPS, busca por voz, foto de perfil e alertas de preço.</p>
+        <ol>
+          <li>Toque em <b>Baixar APK</b>.</li>
+          <li>Abra o arquivo baixado.</li>
+          <li>Se o Android pedir, permita instalar de <b>fontes desconhecidas</b> para o navegador.</li>
+        </ol>
+        <a class="btn" id="apk" href="https://github.com/MarcioFerreiraL/clinics-mobile/releases/download/app-latest/clinics.apk">Baixar APK</a>
+      </article>
+
+      <article class="card" id="ios">
+        <span class="tag">Recomendado para o seu aparelho</span>
+        <h2>iPhone e iPad</h2>
+        <p>Use a versão web e instale na tela inicial; ela abre em tela cheia, como um app.</p>
+        <ol>
+          <li>Abra o link abaixo no <b>Safari</b>.</li>
+          <li>Toque em <b>Compartilhar</b>.</li>
+          <li>Escolha <b>Adicionar à Tela de Início</b>.</li>
+        </ol>
+        <a class="btn mint" href="/app/">Abrir no navegador</a>
+      </article>
+
+      <article class="card" id="web">
+        <h2>Computador e outros</h2>
+        <p>Sem instalar nada: abra a versão web em qualquer navegador moderno.</p>
+        <a class="btn" href="/app/">Usar agora</a>
+      </article>
+    </div>
+
+    <section class="features">
+      <h2>O que o Clinics faz</h2>
+      <div class="feat">
+        <div><b>Compara preços</b>Média local e economia de cada clínica, com o selo de melhor preço.</div>
+        <div><b>Entende você</b>Busque por "colesterol" ou "chapa do braço": o Clinics sabe o exame.</div>
+        <div><b>Por bairro</b>Filtre por bairro, preço e avaliação, ou ordene pela clínica mais perto.</div>
+        <div><b>Direto no WhatsApp</b>Fale com a clínica com a mensagem já pronta.</div>
+      </div>
+    </section>
+  </main>
+
+  <div class="wrap">
+    <footer>
+      <span>Projeto de <b>MárcioDev</b> e <b>Lucas</b> · Surubim, PE</span>
+      <span><a href="/docs">Documentação da API</a> · <a href="https://github.com/MarcioFerreiraL/clinics-mobile">Código-fonte</a></span>
+    </footer>
+  </div>
+
+  <script>
+    // Destaca o cartão certo para o aparelho de quem acessa.
+    var ua = navigator.userAgent || '';
+    var isIos = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    var target = /Android/.test(ua) ? 'android' : (isIos ? 'ios' : null);
+    if (target) {
+      var card = document.getElementById(target);
+      card.classList.add('recommended');
+      card.parentNode.insertBefore(card, card.parentNode.firstChild);
+    }
+  </script>
+</body>
+</html>

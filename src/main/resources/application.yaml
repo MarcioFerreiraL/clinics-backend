@@ -20,6 +20,12 @@ spring:
           time_zone: UTC
   flyway:
     enabled: true
+  web:
+    resources:
+      cache:
+        # Sempre revalida (ETag): o app web tem service worker e não pode ficar preso numa versão velha.
+        cachecontrol:
+          no-cache: true
   servlet:
     multipart:
       max-file-size: 3MB
