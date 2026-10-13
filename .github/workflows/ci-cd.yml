@@ -57,7 +57,7 @@ jobs:
   deploy:
     name: Deploy na VPS
     needs: [test, docker]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/develop' && vars.DEPLOY_ENABLED == 'true'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
     environment: production
     concurrency:
