@@ -1,0 +1,42 @@
+# Ambiente de carga: espelha a VPS (2 CPUs; API 600 MB, banco 200 MB com os mesmos parâmetros da produção).
+# Uso: docker compose -f loadtest/compose.loadtest.yaml -p clinicsload up -d
+services:
+  postgres:
+    image: postgres:17-alpine
+    mem_limit: 200m
+    command: >
+      postgres -c shared_buffers=64MB -c effective_cache_size=192MB -c work_mem=4MB -c maintenance_work_mem=32MB
+      -c max_connections=30 -c wal_buffers=4MB -c checkpoint_completion_target=0.9 -c random_page_cost=1.1 -c jit=off
+    environment:
+      POSTGRES_DB: clinics
+      POSTGRES_USER: clinics
+      POSTGRES_PASSWORD: carga-local
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clinics -d clinics"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    image: ${API_IMAGE:-clinics-api:latest}
+    mem_limit: 600m
+    cpus: 2.0
+    init: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/clinics
+      DB_USER: clinics
+      DB_PASSWORD: carga-local
+      JWT_SECRET: segredo-somente-para-teste-de-carga-0123456789abcdef
+      AVATARS_DIR: /app/data/avatars
+      JAVA_OPTS: "-XX:MaxRAMPercentage=65 -XX:+UseSerialGC -XX:MaxMetaspaceSize=128m -Xss512k -XX:+ExitOnOutOfMemoryError"
+    ports:
+      - "127.0.0.1:${LOAD_PORT:-8091}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8080/actuator/health | grep -q UP || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
