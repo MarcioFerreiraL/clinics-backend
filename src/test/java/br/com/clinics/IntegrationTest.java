@@ -12,7 +12,7 @@ import org.springframework.context.annotation.Import;
 /** Teste de integração com a aplicação completa e PostgreSQL real (Testcontainers). */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
-@SpringBootTest
+@SpringBootTest(properties = "app.storage.avatars-dir=target/test-avatars")
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
 public @interface IntegrationTest {
