@@ -31,6 +31,7 @@ services:
       DB_PASSWORD: carga-local
       JWT_SECRET: segredo-somente-para-teste-de-carga-0123456789abcdef
       AVATARS_DIR: /app/data/avatars
+      SPRING_THREADS_VIRTUAL_ENABLED: "${VT:-false}"
       JAVA_OPTS: "-XX:MaxRAMPercentage=65 -XX:+UseSerialGC -XX:MaxMetaspaceSize=128m -Xss512k -XX:+ExitOnOutOfMemoryError"
     ports:
       - "127.0.0.1:${LOAD_PORT:-8091}:8080"
