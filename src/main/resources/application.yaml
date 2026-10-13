@@ -29,6 +29,13 @@ server:
     include-message: never
     include-stacktrace: never
 
+springdoc:
+  paths-to-match: /api/**
+  swagger-ui:
+    operations-sorter: method
+    tags-sorter: alpha
+    display-request-duration: true
+
 management:
   endpoints:
     web:
