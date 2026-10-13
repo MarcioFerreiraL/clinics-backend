@@ -70,3 +70,5 @@ app:
       expiration: 1h
   storage:
     avatars-dir: ${AVATARS_DIR:./data/avatars}
+  # Pasta com o APK do Android servido em /download/clinics.apk
+  downloads-dir: ${DOWNLOADS_DIR:./data/downloads}

@@ -80,7 +80,7 @@ class OpenApiIntegrationTest {
         String html = new String(new org.springframework.core.io.ClassPathResource("static/index.html")
                 .getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
         org.assertj.core.api.Assertions.assertThat(html)
-                .contains("Baixar APK", "releases/download/app-latest/clinics.apk", "href=\"/app/\"", "href=\"/docs\"",
+                .contains("Baixar APK", "/download/clinics.apk", "href=\"/app/\"", "href=\"/docs\"",
                         "MárcioDev");
     }
 

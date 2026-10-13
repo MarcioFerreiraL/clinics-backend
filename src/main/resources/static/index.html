@@ -40,6 +40,8 @@
     .feat { display:grid; gap:12px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
     .feat div { background:var(--mist); border-radius:14px; padding:16px; font-size:15px; }
     .feat b { display:block; color:var(--blue-deep); margin-bottom:4px; }
+    .note { font-size:13px; margin-top:-2px; }
+    .btn.off { background:var(--line); color:var(--muted); pointer-events:none; }
     footer { border-top:1px solid var(--line); margin-top:28px; padding: 22px 0 36px; color:var(--muted); font-size:14px;
              display:flex; flex-wrap:wrap; gap:8px 24px; justify-content:space-between; }
     footer a { color: var(--blue); text-decoration: none; font-weight:600; }
@@ -68,7 +70,8 @@
           <li>Abra o arquivo baixado.</li>
           <li>Se o Android pedir, permita instalar de <b>fontes desconhecidas</b> para o navegador.</li>
         </ol>
-        <a class="btn" id="apk" href="https://github.com/MarcioFerreiraL/clinics-mobile/releases/download/app-latest/clinics.apk">Baixar APK</a>
+        <a class="btn" id="apk" href="/download/clinics.apk" download="clinics.apk">Baixar APK</a>
+        <p id="apk-info" class="note"></p>
       </article>
 
       <article class="card" id="ios">
@@ -109,6 +112,19 @@
   </div>
 
   <script>
+    // Mostra o tamanho do APK ou avisa se ele ainda não foi publicado.
+    fetch('/download/clinics.apk', { method: 'HEAD' }).then(function (r) {
+      var info = document.getElementById('apk-info');
+      if (r.ok) {
+        var bytes = parseInt(r.headers.get('Content-Length') || '0', 10);
+        if (bytes) info.textContent = 'Arquivo de ' + Math.round(bytes / 1048576) + ' MB · Android 7 ou mais novo';
+      } else {
+        var btn = document.getElementById('apk');
+        btn.classList.add('off'); btn.removeAttribute('download'); btn.textContent = 'Indisponível no momento';
+        info.textContent = 'O aplicativo Android estará disponível em breve. Enquanto isso, use a versão web.';
+      }
+    }).catch(function () {});
+
     // Destaca o cartão certo para o aparelho de quem acessa.
     var ua = navigator.userAgent || '';
     var isIos = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
