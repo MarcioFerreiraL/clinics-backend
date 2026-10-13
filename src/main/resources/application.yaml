@@ -15,6 +15,10 @@ spring:
           time_zone: UTC
   flyway:
     enabled: true
+  servlet:
+    multipart:
+      max-file-size: 3MB
+      max-request-size: 4MB
   jackson:
     default-property-inclusion: non_null
     property-naming-strategy: SNAKE_CASE
@@ -37,3 +41,5 @@ app:
       # Em produção defina JWT_SECRET (>= 32 bytes). O valor padrão serve só para desenvolvimento local.
       secret: ${JWT_SECRET:dev-only-secret-change-me-in-production-0123456789}
       expiration: 1h
+  storage:
+    avatars-dir: ${AVATARS_DIR:./data/avatars}

@@ -1,6 +1,7 @@
 package br.com.clinics.identity.infrastructure.persistence;
 
 import java.util.Optional;
+import java.util.UUID;
 
 import br.com.clinics.identity.application.port.out.UserRepository;
 import br.com.clinics.identity.domain.Phone;
@@ -24,6 +25,16 @@ class UserPersistenceAdapter implements UserRepository {
     @Override
     public boolean existsByPhone(Phone phone) {
         return jpa.existsByPhone(phone.digits());
+    }
+
+    @Override
+    public Optional<User> findById(UUID id) {
+        return jpa.findById(id).map(this::toDomain);
+    }
+
+    @Override
+    public boolean existsByEmailExcluding(String email, UUID excludedId) {
+        return jpa.existsByEmailIgnoreCaseAndIdNot(email, excludedId);
     }
 
     @Override

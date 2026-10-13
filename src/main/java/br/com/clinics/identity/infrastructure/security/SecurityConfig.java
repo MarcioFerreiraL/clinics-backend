@@ -51,6 +51,7 @@ class SecurityConfig {
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/exams/**", "/api/v1/exam-types/**", "/api/v1/clinics/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/exams/*/contacts").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/files/**").permitAll()
                         .requestMatchers("/actuator/health/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth -> oauth
