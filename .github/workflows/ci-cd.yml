@@ -1,0 +1,54 @@
+name: CI/CD do back-end
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Testes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      # Os testes de integração usam Testcontainers (Docker já vem no runner).
+      - name: Rodar testes
+        run: ./mvnw -B verify
+
+  docker:
+    name: Imagem Docker
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construir a imagem (sem publicar)
+        run: docker build -t clinics-api:${{ github.sha }} .
+
+  deploy:
+    name: Deploy na VPS
+    needs: [test, docker]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop' && vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preparar a chave SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+      - name: Publicar
+        run: deploy/deploy.sh "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" ~/.ssh/deploy_key
