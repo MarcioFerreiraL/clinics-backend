@@ -1,0 +1,43 @@
+package br.com.clinics.identity.infrastructure.persistence;
+
+import java.util.Optional;
+
+import br.com.clinics.identity.application.port.out.UserRepository;
+import br.com.clinics.identity.domain.Phone;
+import br.com.clinics.identity.domain.User;
+import org.springframework.stereotype.Component;
+
+@Component
+class UserPersistenceAdapter implements UserRepository {
+
+    private final SpringDataUserRepository jpa;
+
+    UserPersistenceAdapter(SpringDataUserRepository jpa) {
+        this.jpa = jpa;
+    }
+
+    @Override
+    public Optional<User> findByPhone(Phone phone) {
+        return jpa.findByPhone(phone.digits()).map(this::toDomain);
+    }
+
+    @Override
+    public boolean existsByPhone(Phone phone) {
+        return jpa.existsByPhone(phone.digits());
+    }
+
+    @Override
+    public User save(User user) {
+        return toDomain(jpa.save(toEntity(user)));
+    }
+
+    private User toDomain(UserJpaEntity e) {
+        return new User(e.getId(), new Phone(e.getPhone()), e.getEmail(), e.getPasswordHash(), e.getFullName(),
+                e.getRole(), e.getBirthDate(), e.getAvatarUrl(), e.getCreatedAt(), e.getUpdatedAt());
+    }
+
+    private UserJpaEntity toEntity(User u) {
+        return new UserJpaEntity(u.id(), u.phone().digits(), u.email(), u.passwordHash(), u.fullName(), u.role(),
+                u.birthDate(), u.avatarUrl(), u.createdAt(), u.updatedAt());
+    }
+}

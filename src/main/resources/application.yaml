@@ -17,6 +17,7 @@ spring:
     enabled: true
   jackson:
     default-property-inclusion: non_null
+    property-naming-strategy: SNAKE_CASE
 
 server:
   port: ${PORT:8080}
@@ -29,3 +30,10 @@ management:
     web:
       exposure:
         include: health,info
+
+app:
+  security:
+    jwt:
+      # Em produção defina JWT_SECRET (>= 32 bytes). O valor padrão serve só para desenvolvimento local.
+      secret: ${JWT_SECRET:dev-only-secret-change-me-in-production-0123456789}
+      expiration: 1h
