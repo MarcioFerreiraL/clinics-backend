@@ -272,6 +272,8 @@ O modelo está na **3ª forma normal**, com uma desnormalização deliberada (D6
 | V5 | `V5__seed_demo_data.sql` | 6 clínicas, horários, 18 tipos de exame, 31 ofertas, histórico de preço e contatos de exemplo |
 | V6 | `V6__seed_demo_reviews.sql` | 5 pacientes de demonstração (sem login) e 21 avaliações; recalcula `rating` e `review_count` das clínicas |
 | V7 | `V7__add_cpf_to_users.sql` | Coluna `cpf` e índice único parcial |
+| V8 | `V8__surubim_demo_clinics.sql` | Clínicas de demonstração ambientadas em Surubim, com nomes e bairros alterados |
+| V9 | `V9__exam_type_aliases.sql` | Tabela `exam_type_aliases` com os nomes populares dos exames |
 
 O banco tem **9 tabelas de domínio**: `users`, `clinics`, `clinic_operating_hours`, `exam_types`, `exams`, `favorites`, `reviews`, `price_history` e `contact_events`. As colunas e restrições do esquema real seguem o modelo lógico da seção 3, com duas particularidades: `reviews` ganhou `updated_at` (reavaliar altera a data) e `exams` não tem contador de visualizações (o "em alta" usa contatos).
 

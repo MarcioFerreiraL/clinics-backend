@@ -16,7 +16,8 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
 /**
- * Consulta nativa: funções de janela calculam média e mínimo por tipo, e {@code unaccent} faz a busca sem acento.
+ * Consulta nativa: funções de janela calculam média e mínimo por tipo, e {@code unaccent} faz a busca sem acento,
+ * tanto pelo nome clínico quanto pelos nomes populares (apelidos) do exame (RN39).
  */
 @Repository
 class ExamOfferJdbcRepository implements ExamOfferRepository {
@@ -41,7 +42,12 @@ class ExamOfferJdbcRepository implements ExamOfferRepository {
 
     private static final String SEARCH_SQL = BASE + """
             WHERE (:category IS NULL OR category = :category)
-              AND (:pattern IS NULL OR unaccent(lower(exam_name)) LIKE unaccent(lower(:pattern)) ESCAPE '\\')
+              AND (:pattern IS NULL
+                   OR unaccent(lower(exam_name)) LIKE unaccent(lower(:pattern)) ESCAPE '\\'
+                   OR EXISTS (SELECT 1 FROM exam_type_aliases a
+                              WHERE a.exam_type_id = offers.exam_type_id
+                                AND (unaccent(lower(a.alias)) LIKE unaccent(lower(:pattern)) ESCAPE '\\'
+                                     OR unaccent(lower(:text)) LIKE '%' || unaccent(lower(a.alias)) || '%')))
             """;
 
     private final JdbcClient jdbc;
@@ -55,6 +61,7 @@ class ExamOfferJdbcRepository implements ExamOfferRepository {
         return jdbc.sql(SEARCH_SQL)
                 .param("category", category == null ? null : category.name(), java.sql.Types.VARCHAR)
                 .param("pattern", text == null ? null : "%" + escapeLike(text) + "%", java.sql.Types.VARCHAR)
+                .param("text", text, java.sql.Types.VARCHAR)
                 .query(ExamOfferJdbcRepository::map)
                 .list();
     }

@@ -74,7 +74,7 @@ O token tem as claims `sub` (id do usuário), `role`, `iat` e `exp`.
 
 | Parâmetro | Tipo | Observação |
 |---|---|---|
-| `query` | texto | Ignora caixa e acentos; `%` e `_` são texto literal |
+| `query` | texto | Nome clínico ou popular ("colesterol", "esteira", "chapa do braço"); ignora caixa e acentos; `%` e `_` são texto literal |
 | `category` | texto | `Sangue`, `Raio-X`, `Consultas`, `Cardio` ou `Ultrassom` |
 | `sort_by` | texto | `price` (padrão), `rating`, `name` ou `distance` |
 | `lat`, `lng` | decimal | Obrigatórios com `sort_by=distance`; sempre juntos. Não são armazenados (RN20) |

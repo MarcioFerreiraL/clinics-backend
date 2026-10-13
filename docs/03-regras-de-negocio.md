@@ -64,6 +64,7 @@ Cada regra tem um identificador estável (`RN`) para ser citado em código, test
 | RN36 | Dados sensíveis (hash de senha, token) nunca aparecem em respostas ou logs. | Aplicação |
 | RN37 | O cadastro exige CPF, e-mail e data de nascimento. O CPF é normalizado para 11 dígitos, tem os dígitos verificadores validados, é **único** e não é editável pelo perfil. Aparece formatado só no `GET /me`. | Domínio + índice único parcial |
 | RN38 | A busca aceita filtros combináveis: bairro, faixa de preço, nota mínima da clínica e somente melhor preço. Média e menor preço continuam calculados sobre todas as ofertas do tipo (RN14). A lista de bairros vem das clínicas cadastradas. | Aplicação |
+| RN39 | A busca entende nomes populares: cada tipo de exame tem apelidos (`exam_type_aliases`), como "colesterol" para Lipidograma ou "esteira" para Teste Ergométrico. O texto casa com o nome clínico ou com um apelido, ignorando caixa e acentos, e também quando o apelido aparece dentro de uma frase maior. | Consulta |
 
 ## Regras reservadas para a Entrega 3
 

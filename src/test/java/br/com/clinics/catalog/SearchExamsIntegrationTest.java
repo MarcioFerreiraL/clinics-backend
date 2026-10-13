@@ -163,4 +163,44 @@ class SearchExamsIntegrationTest {
                         "Bairro Novo", "Centro", "Cohab", "Santa Rita", "São José")))
                 .andExpect(jsonPath("$[?(@.name=='Centro')].clinics_count").value(2));
     }
+
+    private void assertFinds(String popularTerm, String examName) throws Exception {
+        mvc.perform(get("/api/v1/exams/search").param("query", popularTerm).param("size", "50"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[*].exam_type.name").value(org.hamcrest.Matchers.hasItem(examName)));
+    }
+
+    @Test
+    void findsExamsByPopularNames() throws Exception {
+        assertFinds("colesterol", "Lipidograma Completo");
+        assertFinds("EXAME DE AÇÚCAR", "Glicemia de Jejum");
+        assertFinds("diabetes", "Glicemia de Jejum");
+        assertFinds("esteira", "Teste Ergométrico");
+        assertFinds("chapa do braço", "Raio-X de Membros");
+        assertFinds("ecografia", "Ultrassom Abdominal Total");
+        assertFinds("ultra de gravidez", "Ultrassom Obstétrico");
+        assertFinds("eletro", "Eletrocardiograma (ECG)");
+        assertFinds("preventivo", "Consulta Ginecologia");
+        assertFinds("pediatra", "Consulta Pediatria");
+    }
+
+    @Test
+    void popularNameInsideALongerSentenceStillMatches() throws Exception {
+        assertFinds("quero fazer exame de colesterol", "Lipidograma Completo");
+    }
+
+    @Test
+    void genericBloodTermReturnsAllBloodExams() throws Exception {
+        mvc.perform(get("/api/v1/exams/search").param("query", "exame de sangue").param("size", "50"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[*].exam_type.category").value(org.hamcrest.Matchers.everyItem(
+                        org.hamcrest.Matchers.is("Sangue"))));
+    }
+
+    @Test
+    void unknownTermStillReturnsNothing() throws Exception {
+        mvc.perform(get("/api/v1/exams/search").param("query", "xyzabc"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(0));
+    }
 }
