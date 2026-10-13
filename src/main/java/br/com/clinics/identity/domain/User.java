@@ -2,11 +2,14 @@ package br.com.clinics.identity.domain;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.regex.Pattern;
 import java.util.UUID;
 
 import br.com.clinics.shared.domain.ValidationException;
 
 public class User {
+
+    private static final Pattern EMAIL = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
 
     private final UUID id;
     private final Phone phone;
@@ -40,6 +43,34 @@ public class User {
         }
         return new User(UUID.randomUUID(), phone, null, passwordHash, fullName.strip(), Role.PATIENT,
                 null, null, now, now);
+    }
+
+    /** RN32 e RN33: nome, e-mail e data de nascimento são editáveis; o telefone não é. */
+    public void updateProfile(String newFullName, String newEmail, LocalDate newBirthDate, LocalDate today, Instant now) {
+        if (newFullName == null || newFullName.isBlank()) {
+            throw new ValidationException("INVALID_NAME", "Informe seu nome completo.");
+        }
+        String normalizedEmail = newEmail == null || newEmail.isBlank() ? null : newEmail.strip().toLowerCase();
+        if (normalizedEmail != null && (normalizedEmail.length() > 255 || !EMAIL.matcher(normalizedEmail).matches())) {
+            throw new ValidationException("INVALID_EMAIL", "Informe um e-mail válido.");
+        }
+        if (newBirthDate != null && newBirthDate.isAfter(today)) {
+            throw new ValidationException("INVALID_BIRTH_DATE", "A data de nascimento não pode estar no futuro.");
+        }
+        this.fullName = newFullName.strip();
+        this.email = normalizedEmail;
+        this.birthDate = newBirthDate;
+        this.updatedAt = now;
+    }
+
+    public void changePasswordHash(String newHash, Instant now) {
+        this.passwordHash = newHash;
+        this.updatedAt = now;
+    }
+
+    public void changeAvatar(String newAvatarUrl, Instant now) {
+        this.avatarUrl = newAvatarUrl;
+        this.updatedAt = now;
     }
 
     public UUID id() {
