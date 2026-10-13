@@ -95,9 +95,9 @@ sequenceDiagram
     P->>C: GET /exams/search?query&category&sort_by&lat&lng
     C->>S: search(query)
     S->>D: ExamCategory.parse(), ExamSort.parse(), new GeoPoint(lat,lng)
-    D-->>S: valida; sort=distance sem lat/lng → LOCATION_REQUIRED (400)
+    D-->>S: valida — sort=distance sem lat e lng gera LOCATION_REQUIRED (400)
     S->>R: findAvailable(texto, categoria)
-    Note over R: Uma consulta: funções de janela calculam<br/>AVG e MIN por tipo de exame; unaccent na busca
+    Note over R: Uma consulta: funções de janela calculam<br/>AVG e MIN por tipo de exame, unaccent na busca
     R-->>S: ofertas com average_price e min_price
     loop para cada oferta
         S->>D: distanceKmFrom(origem) — Haversine
