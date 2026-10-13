@@ -15,11 +15,11 @@
            background:#fff; line-height:1.5; }
     .wrap { max-width: 920px; margin: 0 auto; padding: 0 20px; }
     header.hero { background: var(--mist); padding: 48px 0 56px; text-align: center; }
-    .brand { display:inline-flex; align-items:center; gap:10px; font-weight:800; font-size:20px; color:var(--blue); }
-    .brand img { width:36px; height:36px; }
+    .brand { display:inline-flex; align-items:center; gap:10px; font-weight:800; font-size:26px; color:var(--blue); }
+    .brand img { width:48px; height:48px; }
     h1 { font-size: clamp(28px, 5vw, 44px); line-height:1.15; margin: 28px auto 12px; max-width: 640px; }
     .lead { color:var(--muted); font-size:18px; max-width: 560px; margin: 0 auto; }
-    .logo-big { width:120px; height:120px; margin-top:8px; }
+    .logo-big { width:168px; height:168px; display:block; margin: 0 auto 4px; }
     main { padding: 36px 0 12px; }
     .grid { display:grid; gap:16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
     .card { border:1px solid var(--line); border-radius:16px; padding:22px; background:#fff; display:flex; flex-direction:column; gap:10px; }
@@ -49,7 +49,8 @@
 <body>
   <header class="hero">
     <div class="wrap">
-      <span class="brand"><img src="/logo.png" alt="">Clinics</span>
+      <img class="logo-big" src="/logo.png" alt="Logo do Clinics">
+      <span class="brand"><span>Clinics</span></span>
       <h1>Compare o preço do exame e chame a clínica no WhatsApp</h1>
       <p class="lead">Clínicas e laboratórios de Surubim-PE lado a lado: preço, distância e avaliação.
         Baixe o app ou use direto no navegador.</p>
