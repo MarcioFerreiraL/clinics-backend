@@ -1,3 +1,6 @@
+# Desenvolvimento local: `docker compose up -d --build` sobe o banco e a API juntos.
+# Só o banco (para rodar a API pelo Maven): `docker compose up -d postgres`.
+# Produção usa o compose.prod.yaml.
 services:
   postgres:
     image: postgres:17-alpine
@@ -16,5 +19,30 @@ services:
       timeout: 3s
       retries: 10
 
+  api:
+    build: .
+    container_name: clinics_api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/clinics
+      DB_USER: clinics
+      DB_PASSWORD: clinics
+      # Valor só para desenvolvimento local (>= 32 bytes). Em produção o segredo vem do .env.
+      JWT_SECRET: dev-only-secret-change-me-in-production-0123456789
+      AVATARS_DIR: /app/data/avatars
+    ports:
+      - "8080:8080"
+    volumes:
+      - clinics_avatars:/app/data/avatars
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8080/actuator/health | grep -q UP || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 40s
+
 volumes:
   clinics_pgdata:
+  clinics_avatars:
