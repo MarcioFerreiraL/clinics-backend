@@ -73,7 +73,26 @@ flowchart LR
     P --> UC18
 ```
 
-## 3. Especificação resumida
+## 3. Estado de implementação
+
+| UC | Caso de uso | Back-end | Testes de integração |
+|---|---|---|---|
+| UC01 | Cadastrar conta | ✅ | `AuthIntegrationTest` |
+| UC02 | Autenticar | ✅ | `AuthIntegrationTest` |
+| UC03 | Buscar e comparar exames | ✅ | `SearchExamsIntegrationTest` |
+| UC04 | Ver detalhes do exame | ✅ | `ExamAndClinicDetailsIntegrationTest` |
+| UC05 | Ver perfil da clínica | ✅ | `ExamAndClinicDetailsIntegrationTest` |
+| UC06 | Ver exames em alta | ✅ | `ContactAndTrendingIntegrationTest` |
+| UC07 | Contatar clínica por WhatsApp | ✅ | `ContactAndTrendingIntegrationTest` |
+| UC08 | Ver economia | ✅ | `SavingsIntegrationTest` |
+| UC09 | Favoritar exames | ✅ | `FavoritesIntegrationTest` |
+| UC10 | Avaliar clínica | ✅ | `ReviewsIntegrationTest` |
+| UC11 | Gerenciar perfil | ✅ | `ProfileIntegrationTest` |
+| UC12 | Alterar senha | ✅ | `ProfileIntegrationTest` |
+
+Os 12 casos de uso da Entrega 2 estão implementados no back-end. Os exemplos de requisição e resposta de cada endpoint estão em [`07-referencia-da-api.md`](07-referencia-da-api.md) e os fluxos internos em [`08-diagramas-de-sequencia.md`](08-diagramas-de-sequencia.md).
+
+## 4. Especificação resumida
 
 | UC | Nome | Ator | Pré-condição | Fluxo principal | Fluxos alternativos | Regras | Endpoint |
 |---|---|---|---|---|---|---|---|
@@ -86,11 +105,11 @@ flowchart LR
 | UC07 | Contatar clínica por WhatsApp | Visitante | Oferta disponível | Toca no botão → registra contato → recebe o link | Oferta inexistente (404) | RN28, RN29 | `POST /api/v1/exams/{id}/contacts` |
 | UC08 | Ver economia | Paciente | Autenticado | Abre perfil → recebe o total economizado | – | RN31 | `GET /api/v1/me/savings` |
 | UC09 | Favoritar exames | Paciente | Autenticado | Favorita um tipo de exame; pode listar e remover | Já favoritado (idempotente) | RN23 | `PUT/DELETE /api/v1/me/favorites/{examTypeId}`, `GET /api/v1/me/favorites` |
-| UC10 | Avaliar clínica | Paciente | Autenticado | Envia nota e comentário → salva → recalcula a média | Nota inválida (400); reavaliação substitui | RN25–RN27 | `PUT /api/v1/clinics/{id}/reviews/me`, `GET /api/v1/clinics/{id}/reviews` |
+| UC10 | Avaliar clínica | Paciente | Autenticado | Envia nota e comentário → salva → recalcula a média | Nota inválida (400); reavaliação substitui (200) | RN25–RN27 | `PUT /api/v1/clinics/{id}/reviews/me`, `GET /api/v1/clinics/{id}/reviews/me`, `GET /api/v1/clinics/{id}/reviews` |
 | UC11 | Gerenciar perfil | Paciente | Autenticado | Consulta e edita dados; envia foto | Dados inválidos (400) | RN32–RN36 | `GET/PUT /api/v1/me`, `PUT /api/v1/me/avatar` |
 | UC12 | Alterar senha | Paciente | Autenticado | Informa senha atual e nova → troca | Senha atual errada (400) | RN03, RN08 | `PUT /api/v1/me/password` |
 
-## 4. Matriz de rastreabilidade
+## 5. Matriz de rastreabilidade
 
 | Caso de uso | Requisitos | Histórias | Regras |
 |---|---|---|---|
