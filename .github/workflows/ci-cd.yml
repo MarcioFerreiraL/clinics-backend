@@ -24,6 +24,26 @@ jobs:
       # Os testes de integração usam Testcontainers (Docker já vem no runner).
       - name: Rodar testes
         run: ./mvnw -B verify
+      - name: Resumo dos testes
+        if: always()
+        run: |
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import glob, re
+          t = f = e = s = 0
+          for p in glob.glob('target/surefire-reports/TEST-*.xml'):
+              m = re.search(r'tests="(\d+)" errors="(\d+)" skipped="(\d+)" failures="(\d+)"', open(p, encoding='utf-8').read())
+              if m:
+                  a, b, c, d = map(int, m.groups()); t += a; e += b; s += c; f += d
+          print('### Testes do back-end')
+          print(f'| Total | Falhas | Erros | Ignorados |\n|---|---|---|---|\n| {t} | {f} | {e} | {s} |')
+          PY
+      - name: Publicar relatórios dos testes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: relatorios-de-teste
+          path: target/surefire-reports/
+          retention-days: 14
 
   docker:
     name: Imagem Docker

@@ -32,7 +32,10 @@ ssh_run "cd $REMOTE_DIR && sudo docker compose -f compose.prod.yaml up -d"
 echo "==> Aguardando a API"
 for _ in $(seq 1 40); do
   if ssh_run 'curl -fs http://localhost:8080/actuator/health' | grep -q UP; then
-    echo "API no ar na VPS (porta 8080)"; exit 0
+    echo "API no ar na VPS (porta 8080)"
+    echo "==> Smoke test"
+    ssh_run 'bash -s' < deploy/smoke-test.sh
+    exit 0
   fi
   sleep 5
 done
