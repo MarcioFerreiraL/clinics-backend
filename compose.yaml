@@ -1,4 +1,5 @@
 # Desenvolvimento local: `docker compose up -d --build` sobe o banco e a API juntos.
+# Lê as variáveis do arquivo .env (copie de .env.example).
 # Só o banco (para rodar a API pelo Maven): `docker compose up -d postgres`.
 # Produção usa o compose.prod.yaml.
 services:
@@ -8,7 +9,7 @@ services:
     environment:
       POSTGRES_DB: clinics
       POSTGRES_USER: clinics
-      POSTGRES_PASSWORD: clinics
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-clinics}
     ports:
       - "5433:5432"
     volumes:
@@ -28,9 +29,9 @@ services:
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/clinics
       DB_USER: clinics
-      DB_PASSWORD: clinics
-      # Valor só para desenvolvimento local (>= 32 bytes). Em produção o segredo vem do .env.
-      JWT_SECRET: dev-only-secret-change-me-in-production-0123456789
+      DB_PASSWORD: ${DB_PASSWORD:-clinics}
+      # Lido do .env (veja .env.example); o padrão serve só para desenvolvimento local.
+      JWT_SECRET: ${JWT_SECRET:-dev-only-secret-change-me-in-production-0123456789}
       AVATARS_DIR: /app/data/avatars
     ports:
       - "8080:8080"

@@ -40,8 +40,13 @@ O domínio não depende de Spring nem de JPA, e essa regra é verificada por um 
 **Pré-requisitos:** JDK 25 e Docker.
 
 ```bash
-docker compose up -d            # PostgreSQL na porta 5433
+cp .env.example .env            # variáveis locais (o .env não vai para o Git)
+docker compose up -d postgres   # só o PostgreSQL na porta 5433
+set -a && . ./.env && set +a    # carrega o .env no terminal
 ./mvnw spring-boot:run          # API em http://localhost:8080
+
+# ou banco + API juntos, em containers:
+# docker compose up -d --build
 ```
 
 As migrações rodam sozinhas na primeira subida e já carregam dados de demonstração de Surubim (6 clínicas, 18 tipos de exame, 31 ofertas e avaliações).
