@@ -25,7 +25,7 @@ jobs:
           for i in $(seq 1 40); do curl -fs localhost:8091/actuator/health | grep -q UP && break; sleep 4; done
       - name: Smoke
         run: loadtest/run.sh smoke
-      - name: Carga nominal (limites: RNF03, busca p95 < 300 ms)
+      - name: "Carga nominal (RNF03: busca com p95 abaixo de 300 ms)"
         run: loadtest/run.sh load
       - name: Cenário extra
         if: github.event.inputs.cenario != '' && github.event.inputs.cenario != 'nenhum'
