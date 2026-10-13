@@ -34,3 +34,5 @@ build/
 
 # Arquivos enviados em execução local
 /data/
+
+.env
