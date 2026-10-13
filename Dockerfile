@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf 
 RUN useradd --system --create-home clinics && mkdir -p /app/data/avatars && chown -R clinics /app
 COPY --from=build /app/target/*.jar app.jar
 USER clinics
-ENV AVATARS_DIR=/app/data/avatars
+ENV AVATARS_DIR=/app/data/avatars \
+    JAVA_OPTS="-XX:MaxRAMPercentage=70"
 EXPOSE 8080
-ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-jar", "app.jar"]
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar app.jar"]
