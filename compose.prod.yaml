@@ -3,7 +3,22 @@ services:
   postgres:
     image: postgres:17-alpine
     restart: unless-stopped
-    mem_limit: 256m
+    mem_limit: 200m
+    # Ajustado para ~200 MB: poucos buffers, planejador para SSD e sem JIT (consultas curtas).
+    command: >
+      postgres
+      -c shared_buffers=64MB
+      -c effective_cache_size=192MB
+      -c work_mem=4MB
+      -c maintenance_work_mem=32MB
+      -c max_connections=30
+      -c wal_buffers=4MB
+      -c checkpoint_completion_target=0.9
+      -c random_page_cost=1.1
+      -c jit=off
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
     environment:
       POSTGRES_DB: clinics
       POSTGRES_USER: clinics
@@ -20,7 +35,11 @@ services:
     # A imagem é construída fora da VPS (CI ou máquina local) e enviada pronta: a VPS tem pouca memória.
     image: clinics-api:latest
     restart: unless-stopped
-    mem_limit: 512m
+    mem_limit: 600m
+    init: true
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
     depends_on:
       postgres:
         condition: service_healthy
@@ -30,6 +49,10 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no .env}
       AVATARS_DIR: /app/data/avatars
+      # Heap de ~65% dos 600 MB; GC serial (melhor para heap pequeno); sai se faltar memória (o Docker reinicia).
+      JAVA_OPTS: "-XX:MaxRAMPercentage=65 -XX:+UseSerialGC -XX:MaxMetaspaceSize=128m -Xss512k -XX:+ExitOnOutOfMemoryError"
+      DB_POOL_SIZE: "10"
+      TOMCAT_MAX_THREADS: "100"
     ports:
       # Só em localhost: a exposição pública é feita pelo túnel do Cloudflare, nunca por porta aberta.
       - "127.0.0.1:${API_PORT:-8080}:8080"
