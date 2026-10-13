@@ -49,6 +49,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no .env}
       AVATARS_DIR: /app/data/avatars
+      DOWNLOADS_DIR: /app/downloads
       # Heap de ~65% dos 600 MB; GC serial (melhor para heap pequeno); sai se faltar memória (o Docker reinicia).
       JAVA_OPTS: "-XX:MaxRAMPercentage=65 -XX:+UseSerialGC -XX:MaxMetaspaceSize=128m -Xss512k -XX:+ExitOnOutOfMemoryError"
       DB_POOL_SIZE: "10"
@@ -58,6 +59,8 @@ services:
       - "127.0.0.1:${API_PORT:-8080}:8080"
     volumes:
       - avatars:/app/data/avatars
+      # APK do Android servido em /download/clinics.apk (a pasta é preenchida pelo deploy)
+      - ./downloads:/app/downloads:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -fs http://localhost:8080/actuator/health | grep -q UP || exit 1"]
       interval: 15s

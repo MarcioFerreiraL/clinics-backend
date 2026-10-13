@@ -24,6 +24,22 @@ echo "==> Enviando a imagem e o compose"
 docker save "$IMAGE" | gzip | ssh_run 'gunzip | sudo docker load'
 scp "${SSH_OPTS[@]}" compose.prod.yaml "$TARGET:$REMOTE_DIR/compose.prod.yaml"
 
+echo "==> Atualizando o APK do site (se houver uma versão publicada)"
+ssh_run "mkdir -p $REMOTE_DIR/downloads"
+APK_TMP="$(mktemp)"
+APK_URL="${APK_URL:-https://github.com/MarcioFerreiraL/clinics-mobile/releases/download/app-latest/clinics.apk}"
+if [[ -n "${APK_FILE:-}" ]] && [[ -f "$APK_FILE" ]]; then
+  cp "$APK_FILE" "$APK_TMP"
+elif ! curl -fsSL -o "$APK_TMP" "$APK_URL"; then
+  rm -f "$APK_TMP"
+  echo "AVISO: nenhum APK publicado em $APK_URL; mantendo o que já está na VPS (se houver)."
+fi
+if [[ -s "$APK_TMP" ]]; then
+  scp "${SSH_OPTS[@]}" "$APK_TMP" "$TARGET:$REMOTE_DIR/downloads/clinics.apk.new"
+  ssh_run "chmod 644 $REMOTE_DIR/downloads/clinics.apk.new && mv $REMOTE_DIR/downloads/clinics.apk.new $REMOTE_DIR/downloads/clinics.apk"
+  rm -f "$APK_TMP"
+fi
+
 echo "==> Configurando segredos (só na primeira vez)"
 ssh_run "cd $REMOTE_DIR && [ -f .env ] || { printf 'DB_PASSWORD=%s\nJWT_SECRET=%s\n' \"\$(openssl rand -hex 16)\" \"\$(openssl rand -hex 32)\" > .env; chmod 600 .env; }"
 
