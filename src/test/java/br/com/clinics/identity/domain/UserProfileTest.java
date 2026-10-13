@@ -15,7 +15,8 @@ class UserProfileTest {
     private static final Instant NOW = Instant.parse("2026-10-12T12:00:00Z");
 
     private User newUser() {
-        return User.register(Phone.of("81998765432"), "Maria Silva", "hash", Instant.parse("2026-01-01T00:00:00Z"));
+        return User.register(Phone.of("81998765432"), Cpf.of("529.982.247-25"), "Maria Silva", "maria@email.com",
+                LocalDate.of(1990, 5, 20), "hash", TODAY, Instant.parse("2026-01-01T00:00:00Z"));
     }
 
     @Test

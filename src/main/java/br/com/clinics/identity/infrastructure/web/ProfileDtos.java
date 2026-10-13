@@ -14,11 +14,12 @@ final class ProfileDtos {
     private ProfileDtos() {
     }
 
-    record ProfileResponse(UUID id, String fullName, String phone, String email, LocalDate birthDate, String avatarUrl,
+    record ProfileResponse(UUID id, String fullName, String phone, String cpf, String email, LocalDate birthDate, String avatarUrl,
             Role role, Instant createdAt) {
 
         static ProfileResponse from(User u) {
-            return new ProfileResponse(u.id(), u.fullName(), u.phone().formatted(), u.email(), u.birthDate(),
+            return new ProfileResponse(u.id(), u.fullName(), u.phone().formatted(),
+                    u.cpf() == null ? null : u.cpf().formatted(), u.email(), u.birthDate(),
                     u.avatarUrl(), u.role(), u.createdAt());
         }
     }

@@ -4,6 +4,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import br.com.clinics.identity.application.port.out.UserRepository;
+import br.com.clinics.identity.domain.Cpf;
 import br.com.clinics.identity.domain.Phone;
 import br.com.clinics.identity.domain.User;
 import org.springframework.stereotype.Component;
@@ -28,6 +29,11 @@ class UserPersistenceAdapter implements UserRepository {
     }
 
     @Override
+    public boolean existsByCpf(Cpf cpf) {
+        return jpa.existsByCpf(cpf.digits());
+    }
+
+    @Override
     public Optional<User> findById(UUID id) {
         return jpa.findById(id).map(this::toDomain);
     }
@@ -43,12 +49,12 @@ class UserPersistenceAdapter implements UserRepository {
     }
 
     private User toDomain(UserJpaEntity e) {
-        return new User(e.getId(), new Phone(e.getPhone()), e.getEmail(), e.getPasswordHash(), e.getFullName(),
+        return new User(e.getId(), new Phone(e.getPhone()), e.getCpf() == null ? null : new Cpf(e.getCpf()), e.getEmail(), e.getPasswordHash(), e.getFullName(),
                 e.getRole(), e.getBirthDate(), e.getAvatarUrl(), e.getCreatedAt(), e.getUpdatedAt());
     }
 
     private UserJpaEntity toEntity(User u) {
-        return new UserJpaEntity(u.id(), u.phone().digits(), u.email(), u.passwordHash(), u.fullName(), u.role(),
+        return new UserJpaEntity(u.id(), u.phone().digits(), u.cpf() == null ? null : u.cpf().digits(), u.email(), u.passwordHash(), u.fullName(), u.role(),
                 u.birthDate(), u.avatarUrl(), u.createdAt(), u.updatedAt());
     }
 }

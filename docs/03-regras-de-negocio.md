@@ -62,6 +62,7 @@ Cada regra tem um identificador estável (`RN`) para ser citado em código, test
 | RN34 | A foto aceita JPEG ou PNG de até 2 MB. | Aplicação |
 | RN35 | O usuário só acessa e altera os **próprios** dados. O id vem do token, nunca do corpo ou da URL (previne IDOR). | Segurança |
 | RN36 | Dados sensíveis (hash de senha, token) nunca aparecem em respostas ou logs. | Aplicação |
+| RN37 | O cadastro exige CPF, e-mail e data de nascimento. O CPF é normalizado para 11 dígitos, tem os dígitos verificadores validados, é **único** e não é editável pelo perfil. Aparece formatado só no `GET /me`. | Domínio + índice único parcial |
 
 ## Regras reservadas para a Entrega 3
 

@@ -1,0 +1,3 @@
+ALTER TABLE users ADD COLUMN cpf VARCHAR(11);
+
+CREATE UNIQUE INDEX uq_users_cpf ON users (cpf) WHERE cpf IS NOT NULL;

@@ -1,5 +1,6 @@
 package br.com.clinics.identity;
 
+import br.com.clinics.TestUsers;
 import java.util.concurrent.ThreadLocalRandom;
 
 import br.com.clinics.IntegrationTest;
@@ -43,7 +44,7 @@ class AuthIntegrationTest {
 
     private MvcResult register(String phone, String password) throws Exception {
         return mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON)
-                .content(body("full_name", "Maria Silva", "phone", phone, "password", password))).andReturn();
+                .content(TestUsers.registrationJson("Maria Silva", phone, password))).andReturn();
     }
 
     @Test
@@ -51,7 +52,7 @@ class AuthIntegrationTest {
         String phone = randomPhone();
 
         MvcResult result = mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON)
-                        .content(body("full_name", "Maria Silva", "phone", phone, "password", "Senha1234")))
+                        .content(TestUsers.registrationJson("Maria Silva", phone, "Senha1234")))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.token_type").value("Bearer"))
                 .andExpect(jsonPath("$.user.role").value("PATIENT"))
@@ -83,7 +84,7 @@ class AuthIntegrationTest {
         register(phone, "Senha1234");
 
         mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON)
-                        .content(body("full_name", "Outra Pessoa", "phone", phone, "password", "Senha1234")))
+                        .content(TestUsers.registrationJson("Outra Pessoa", phone, "Senha1234")))
                 .andExpect(status().isConflict())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.code").value("PHONE_ALREADY_REGISTERED"));
@@ -92,7 +93,7 @@ class AuthIntegrationTest {
     @Test
     void rejectsWeakPassword() throws Exception {
         mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON)
-                        .content(body("full_name", "Maria", "phone", randomPhone(), "password", "curta1")))
+                        .content(TestUsers.registrationJson("Maria", randomPhone(), "curta1")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("WEAK_PASSWORD"));
     }
@@ -100,7 +101,7 @@ class AuthIntegrationTest {
     @Test
     void rejectsInvalidPhone() throws Exception {
         mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON)
-                        .content(body("full_name", "Maria", "phone", "(81) 3634-1122", "password", "Senha1234")))
+                        .content(TestUsers.registrationJson("Maria", "(81) 3634-1122", "Senha1234")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_PHONE"));
     }
@@ -110,8 +111,67 @@ class AuthIntegrationTest {
         mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.errors.length()").value(3))
-                .andExpect(jsonPath("$.errors[*].field").value(org.hamcrest.Matchers.containsInAnyOrder("full_name", "phone", "password")));
+                .andExpect(jsonPath("$.errors.length()").value(6))
+                .andExpect(jsonPath("$.errors[*].field").value(org.hamcrest.Matchers.containsInAnyOrder(
+                        "full_name", "phone", "cpf", "email", "birth_date", "password")));
+    }
+
+    private String registrationWith(String field, String value) {
+        var node = mapper.readTree(TestUsers.registrationJson("Maria", randomPhone(), "Senha1234"));
+        ((tools.jackson.databind.node.ObjectNode) node).put(field, value);
+        return node.toString();
+    }
+
+    @Test
+    void rejectsInvalidCpf() throws Exception {
+        mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON)
+                        .content(registrationWith("cpf", "123.456.789-00")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_CPF"));
+    }
+
+    @Test
+    void acceptsFormattedCpfAndStoresOnlyDigits() throws Exception {
+        String cpf = TestUsers.randomCpf();
+        String formatted = "%s.%s.%s-%s".formatted(cpf.substring(0, 3), cpf.substring(3, 6), cpf.substring(6, 9), cpf.substring(9));
+        mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON)
+                        .content(registrationWith("cpf", formatted)))
+                .andExpect(status().isCreated());
+
+        Integer count = jdbc.queryForObject("SELECT count(*) FROM users WHERE cpf = ?", Integer.class, cpf);
+        assertThat(count).isEqualTo(1);
+    }
+
+    @Test
+    void rejectsDuplicatedCpf() throws Exception {
+        String cpf = TestUsers.randomCpf();
+        mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON)
+                .content(registrationWith("cpf", cpf))).andExpect(status().isCreated());
+
+        mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON)
+                        .content(registrationWith("cpf", cpf)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CPF_ALREADY_REGISTERED"));
+    }
+
+    @Test
+    void rejectsDuplicatedEmail() throws Exception {
+        String email = TestUsers.randomEmail();
+        mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON)
+                .content(registrationWith("email", email))).andExpect(status().isCreated());
+
+        mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON)
+                        .content(registrationWith("email", email.toUpperCase())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("EMAIL_ALREADY_IN_USE"));
+    }
+
+    @Test
+    void rejectsFutureBirthDate() throws Exception {
+        mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON)
+                        .content(registrationWith("birth_date", "2999-01-01")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_BIRTH_DATE"));
     }
 
     @Test

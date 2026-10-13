@@ -1,11 +1,13 @@
 package br.com.clinics.identity.infrastructure.web;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 
 import br.com.clinics.identity.application.AuthResult;
 import br.com.clinics.identity.domain.Role;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 final class AuthDtos {
@@ -16,6 +18,9 @@ final class AuthDtos {
     record RegisterRequest(
             @NotBlank(message = "Informe seu nome completo.") @Size(max = 120, message = "Nome muito longo.") String fullName,
             @NotBlank(message = "Informe seu celular.") String phone,
+            @NotBlank(message = "Informe seu CPF.") String cpf,
+            @NotBlank(message = "Informe seu e-mail.") @Size(max = 255, message = "E-mail muito longo.") String email,
+            @NotNull(message = "Informe sua data de nascimento.") LocalDate birthDate,
             @NotBlank(message = "Informe uma senha.") String password) {
     }
 

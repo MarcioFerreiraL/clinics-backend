@@ -35,7 +35,8 @@ class AuthController {
     @Operation(summary = "Cadastra um paciente (UC01)")
     AuthResponse register(@Valid @RequestBody RegisterRequest request) {
         return AuthResponse.from(register.register(
-                new RegisterUserCommand(request.fullName(), request.phone(), request.password())));
+                new RegisterUserCommand(request.fullName(), request.phone(), request.cpf(), request.email(),
+                        request.birthDate(), request.password())));
     }
 
     @PostMapping("/login")

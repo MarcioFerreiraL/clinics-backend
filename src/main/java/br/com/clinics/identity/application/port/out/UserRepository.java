@@ -3,6 +3,7 @@ package br.com.clinics.identity.application.port.out;
 import java.util.Optional;
 import java.util.UUID;
 
+import br.com.clinics.identity.domain.Cpf;
 import br.com.clinics.identity.domain.Phone;
 import br.com.clinics.identity.domain.User;
 
@@ -11,6 +12,8 @@ public interface UserRepository {
     Optional<User> findByPhone(Phone phone);
 
     boolean existsByPhone(Phone phone);
+
+    boolean existsByCpf(Cpf cpf);
 
     Optional<User> findById(UUID id);
 

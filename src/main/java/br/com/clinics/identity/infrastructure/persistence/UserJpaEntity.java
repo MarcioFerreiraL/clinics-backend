@@ -22,6 +22,9 @@ class UserJpaEntity {
     @Column(nullable = false, updatable = false)
     private String phone;
 
+    @Column(updatable = false)
+    private String cpf;
+
     private String email;
 
     @Column(name = "password_hash", nullable = false)
@@ -49,10 +52,11 @@ class UserJpaEntity {
     protected UserJpaEntity() {
     }
 
-    UserJpaEntity(UUID id, String phone, String email, String passwordHash, String fullName, Role role,
+    UserJpaEntity(UUID id, String phone, String cpf, String email, String passwordHash, String fullName, Role role,
             LocalDate birthDate, String avatarUrl, Instant createdAt, Instant updatedAt) {
         this.id = id;
         this.phone = phone;
+        this.cpf = cpf;
         this.email = email;
         this.passwordHash = passwordHash;
         this.fullName = fullName;
@@ -69,6 +73,10 @@ class UserJpaEntity {
 
     String getPhone() {
         return phone;
+    }
+
+    String getCpf() {
+        return cpf;
     }
 
     String getEmail() {

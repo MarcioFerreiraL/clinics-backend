@@ -5,12 +5,12 @@ Formato: **Como** `<ator>`, **quero** `<ação>`, **para** `<benefício>`. Crit�
 ## Épico A · Conta e acesso
 
 ### HU01 · Criar minha conta
-Como **visitante**, quero me cadastrar com nome, telefone e senha, para favoritar exames e avaliar clínicas. *(RF01 · UC01)*
+Como **visitante**, quero me cadastrar com nome, telefone, CPF, e-mail, data de nascimento e senha, para favoritar exames e avaliar clínicas. *(RF01 · UC01)*
 
 ```gherkin
 Cenário: Cadastro válido
   Dado que o telefone "(81) 99876-5432" não está cadastrado
-  Quando eu envio nome, telefone e uma senha com 8 caracteres ou mais
+  Quando eu envio nome, telefone, CPF, e-mail, data de nascimento e uma senha com 8 caracteres ou mais
   Então a conta é criada com o papel PATIENT
   E eu recebo um token de acesso
 

@@ -33,7 +33,7 @@ class ContactAndTrendingIntegrationTest {
     private String registerAndGetToken() throws Exception {
         String phone = "(81) 9%04d-%04d".formatted(ThreadLocalRandom.current().nextInt(10000), ThreadLocalRandom.current().nextInt(10000));
         String json = mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"full_name\":\"Maria\",\"phone\":\"%s\",\"password\":\"Senha1234\"}".formatted(phone)))
+                        .content(br.com.clinics.TestUsers.registrationJson("Maria", phone, "Senha1234")))
                 .andReturn().getResponse().getContentAsString();
         return mapper.readTree(json).get("token").asString();
     }

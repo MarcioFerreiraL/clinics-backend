@@ -53,11 +53,12 @@ erDiagram
     users {
         uuid id PK
         varchar phone UK "somente dígitos, DDI 55"
-        varchar email UK "opcional, único sem caixa"
+        varchar cpf UK "11 dígitos"
+        varchar email UK "único sem caixa"
         varchar password_hash "BCrypt"
         varchar full_name
         varchar role "PATIENT | CLINIC_MANAGER | ADMIN"
-        date birth_date "opcional"
+        date birth_date
         varchar avatar_url "opcional"
         timestamptz created_at
         timestamptz updated_at
@@ -165,6 +166,7 @@ erDiagram
 |---|---|---|
 | `users` | `UNIQUE (phone)` | RN01 |
 | `users` | `UNIQUE (lower(email)) WHERE email IS NOT NULL` | RN04 |
+| `users` | `UNIQUE (cpf) WHERE cpf IS NOT NULL` | RN37 |
 | `users` | `CHECK (role IN ('PATIENT','CLINIC_MANAGER','ADMIN'))` | RN05 |
 | `clinics` | `CHECK (rating BETWEEN 0 AND 5)` | Integridade |
 | `clinics` | `owner_user_id` com `ON DELETE SET NULL` | Excluir o gestor não apaga a clínica |
@@ -190,6 +192,7 @@ erDiagram
 |---|---|---|---|
 | id | uuid | não | PK, `gen_random_uuid()` |
 | phone | varchar(13) | não | `5581998765432` |
+| cpf | varchar(11) | sim | só dígitos; obrigatório no cadastro (nulo apenas nos dados de demonstração) |
 | email | varchar(255) | sim | |
 | password_hash | varchar(100) | não | BCrypt |
 | full_name | varchar(120) | não | |
@@ -268,6 +271,7 @@ O modelo está na **3ª forma normal**, com uma desnormalização deliberada (D6
 | V4 | `V4__create_engagement_tables.sql` | `favorites`, `reviews`, `price_history`, `contact_events` |
 | V5 | `V5__seed_demo_data.sql` | 6 clínicas, horários, 18 tipos de exame, 31 ofertas, histórico de preço e contatos de exemplo |
 | V6 | `V6__seed_demo_reviews.sql` | 5 pacientes de demonstração (sem login) e 21 avaliações; recalcula `rating` e `review_count` das clínicas |
+| V7 | `V7__add_cpf_to_users.sql` | Coluna `cpf` e índice único parcial |
 
 O banco tem **9 tabelas de domínio**: `users`, `clinics`, `clinic_operating_hours`, `exam_types`, `exams`, `favorites`, `reviews`, `price_history` e `contact_events`. As colunas e restrições do esquema real seguem o modelo lógico da seção 3, com duas particularidades: `reviews` ganhou `updated_at` (reavaliar altera a data) e `exams` não tem contador de visualizações (o "em alta" usa contatos).
 

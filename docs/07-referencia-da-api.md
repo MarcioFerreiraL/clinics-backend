@@ -49,7 +49,8 @@ Arquivos de avatar são servidos em `GET /files/avatars/{arquivo}` (público). O
 ### UC01 · `POST /auth/register`
 ```json
 // requisição
-{ "full_name": "Maria Silva", "phone": "(81) 99876-5432", "password": "Senha1234" }
+{ "full_name": "Maria Silva", "phone": "(81) 99876-5432", "cpf": "529.982.247-25",
+  "email": "maria@email.com", "birth_date": "1990-05-20", "password": "Senha1234" }
 ```
 ```json
 // 201
@@ -61,7 +62,7 @@ Arquivos de avatar são servidos em `GET /files/avatars/{arquivo}` (público). O
             "phone": "(81) 99876-5432", "role": "PATIENT" }
 }
 ```
-O telefone aceita qualquer formatação; é normalizado para dígitos com DDI 55 (RN01). Senha: mínimo de 8 caracteres com letras e números (RN03). Erros: `INVALID_PHONE`, `WEAK_PASSWORD`, `PHONE_ALREADY_REGISTERED` (409), `VALIDATION_ERROR`.
+Telefone e CPF aceitam qualquer formatação: o telefone é normalizado para dígitos com DDI 55 (RN01) e o CPF para 11 dígitos, com validação dos dígitos verificadores (RN37). E-mail e data de nascimento são obrigatórios. Senha: mínimo de 8 caracteres com letras e números (RN03). Erros: `INVALID_PHONE`, `INVALID_CPF`, `INVALID_EMAIL`, `INVALID_BIRTH_DATE`, `WEAK_PASSWORD`, `PHONE_ALREADY_REGISTERED`, `CPF_ALREADY_REGISTERED`, `EMAIL_ALREADY_IN_USE` (409), `VALIDATION_ERROR`.
 
 ### UC02 · `POST /auth/login`
 Corpo `{ "phone": "...", "password": "..." }`. A resposta é igual à do cadastro. Falha devolve sempre `INVALID_CREDENTIALS` (401), sem revelar se o telefone existe (RN06).
@@ -192,10 +193,10 @@ A nota (1 a 5) é obrigatória; o comentário tem até 1000 caracteres. Ao salva
 ### UC11 · Perfil
 ```json
 // GET /me
-{ "id": "12cbcc59-...", "full_name": "Maria Silva", "phone": "(81) 99876-5432",
+{ "id": "12cbcc59-...", "full_name": "Maria Silva", "phone": "(81) 99876-5432", "cpf": "529.982.247-25",
   "role": "PATIENT", "created_at": "2026-10-13T01:57:34Z" }
 ```
-`email`, `birth_date` e `avatar_url` aparecem quando preenchidos.
+`email`, `birth_date` e `avatar_url` aparecem quando preenchidos. O CPF não é editável.
 
 `PUT /me` aceita `full_name` (obrigatório), `email` e `birth_date` (`YYYY-MM-DD`). O telefone enviado é ignorado (RN32). E-mail vazio remove o e-mail.
 
@@ -224,11 +225,11 @@ Resposta 204. Erros: `INVALID_CURRENT_PASSWORD`, `WEAK_PASSWORD`, `SAME_PASSWORD
 
 | Status | Códigos |
 |---|---|
-| 400 | `VALIDATION_ERROR`, `MALFORMED_REQUEST`, `INVALID_PHONE`, `WEAK_PASSWORD`, `INVALID_NAME`, `INVALID_EMAIL`, `INVALID_BIRTH_DATE`, `INVALID_AVATAR`, `INVALID_CURRENT_PASSWORD`, `SAME_PASSWORD`, `INVALID_CATEGORY`, `INVALID_SORT`, `LOCATION_REQUIRED`, `LOCATION_INCOMPLETE`, `INVALID_COORDINATES`, `INVALID_RATING`, `COMMENT_TOO_LONG`, `CLINIC_WITHOUT_WHATSAPP` |
+| 400 | `VALIDATION_ERROR`, `MALFORMED_REQUEST`, `INVALID_PHONE`, `INVALID_CPF`, `WEAK_PASSWORD`, `INVALID_NAME`, `INVALID_EMAIL`, `INVALID_BIRTH_DATE`, `INVALID_AVATAR`, `INVALID_CURRENT_PASSWORD`, `SAME_PASSWORD`, `INVALID_CATEGORY`, `INVALID_SORT`, `LOCATION_REQUIRED`, `LOCATION_INCOMPLETE`, `INVALID_COORDINATES`, `INVALID_RATING`, `COMMENT_TOO_LONG`, `CLINIC_WITHOUT_WHATSAPP` |
 | 401 | `INVALID_CREDENTIALS` (login), `UNAUTHENTICATED` (token ausente, inválido ou expirado) |
 | 403 | `ACCESS_DENIED` |
 | 404 | `EXAM_NOT_FOUND`, `EXAM_TYPE_NOT_FOUND`, `CLINIC_NOT_FOUND`, `REVIEW_NOT_FOUND`, `USER_NOT_FOUND` |
-| 409 | `PHONE_ALREADY_REGISTERED`, `EMAIL_ALREADY_IN_USE` |
+| 409 | `PHONE_ALREADY_REGISTERED`, `CPF_ALREADY_REGISTERED`, `EMAIL_ALREADY_IN_USE` |
 | 500 | `INTERNAL_ERROR` (sem detalhes técnicos na resposta) |
 
 ## 5. Como testar manualmente
@@ -238,7 +239,7 @@ docker compose up -d && ./mvnw spring-boot:run
 
 # cadastro e guarda o token
 TOKEN=$(curl -s -X POST localhost:8080/api/v1/auth/register -H 'Content-Type: application/json' \
-  -d '{"full_name":"Maria Silva","phone":"(81) 99876-5432","password":"Senha1234"}' | jq -r .token)
+  -d '{"full_name":"Maria Silva","phone":"(81) 99876-5432","cpf":"529.982.247-25","email":"maria@email.com","birth_date":"1990-05-20","password":"Senha1234"}' | jq -r .token)
 
 # busca pública e rota protegida
 curl "localhost:8080/api/v1/exams/search?query=hemograma"
