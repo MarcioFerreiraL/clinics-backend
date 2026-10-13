@@ -1,9 +1,11 @@
 package br.com.clinics.engagement.infrastructure.persistence;
 
 import java.sql.Timestamp;
+import java.util.UUID;
 
 import br.com.clinics.engagement.application.port.out.ContactEventRepository;
 import br.com.clinics.engagement.domain.ContactEvent;
+import br.com.clinics.engagement.domain.SavingsSummary;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
@@ -28,5 +30,15 @@ class ContactEventJdbcRepository implements ContactEventRepository {
                 .param("savings", e.estimatedSavings())
                 .param("createdAt", Timestamp.from(e.createdAt()))
                 .update();
+    }
+
+    @Override
+    public SavingsSummary summarizeByUser(UUID userId) {
+        return jdbc.sql("""
+                        SELECT COALESCE(SUM(estimated_savings), 0) AS total, COUNT(*) AS contacts
+                        FROM contact_events WHERE user_id = :userId""")
+                .param("userId", userId)
+                .query((rs, row) -> new SavingsSummary(rs.getBigDecimal("total").setScale(2), rs.getLong("contacts")))
+                .single();
     }
 }
