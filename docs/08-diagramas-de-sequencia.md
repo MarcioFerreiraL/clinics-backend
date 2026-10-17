@@ -1,6 +1,6 @@
 # 08 · Diagramas de Sequência
 
-Os fluxos abaixo mostram como uma requisição atravessa as camadas hexagonais (`web` → `application` → `domain` → `infrastructure`). Cada diagrama corresponde ao código real.
+Os fluxos abaixo mostram como uma requisição atravessa as camadas (`controller` → `service` → `repository`), com as regras de negócio nas classes de `model`. Cada diagrama corresponde ao código real; os nomes dos participantes são as classes em `src/main/java/br/com/clinics`.
 
 ## 1. Cadastro e login (UC01, UC02)
 
@@ -10,23 +10,26 @@ sequenceDiagram
     actor P as Paciente (app)
     participant C as AuthController
     participant S as RegisterUserService
-    participant D as Phone / PasswordPolicy (domínio)
+    participant D as Phone / Cpf / PasswordPolicy / User (model)
     participant R as UserRepository (JPA)
     participant H as BcryptPasswordHasher
     participant T as JwtTokenIssuer
 
-    P->>C: POST /auth/register {full_name, phone, password}
+    P->>C: POST /auth/register {full_name, phone, cpf, email, birth_date, password}
     C->>C: Bean Validation (campos obrigatórios)
-    C->>S: register(command)
-    S->>D: Phone.of(raw) e PasswordPolicy.validate()
-    D-->>S: telefone normalizado (5581...) ou ValidationException
-    S->>R: existsByPhone(phone)
-    alt telefone já cadastrado
-        S-->>C: ConflictException PHONE_ALREADY_REGISTERED
+    C->>S: register(RegisterUserCommand)
+    S->>D: Phone.of(raw), Cpf.of(raw) e PasswordPolicy.validate()
+    D-->>S: telefone normalizado (5581...) e CPF válido, ou ValidationException
+    S->>R: existsByPhone(phone) e existsByCpf(cpf)
+    alt telefone ou CPF já cadastrado
+        S-->>C: ConflictException PHONE_ALREADY_REGISTERED / CPF_ALREADY_REGISTERED
         C-->>P: 409 problem+json
-    else telefone livre
+    else livres
         S->>H: hash(password) — BCrypt custo 10
-        S->>R: save(User.register(...) com papel PATIENT)
+        S->>D: User.register(...) com papel PATIENT
+        S->>R: existsByEmailExcluding(email, id)
+        Note over S,R: e-mail em uso gera EMAIL_ALREADY_IN_USE (409)
+        S->>R: save(user)
         S->>T: issue(user) — sub, role, exp
         S-->>C: AuthResult
         C-->>P: 201 {token, user}
@@ -40,12 +43,12 @@ sequenceDiagram
     participant C as AuthController
     participant S as AuthenticateService
     participant R as UserRepository
-    participant H as PasswordHasher
-    participant T as TokenIssuer
+    participant H as BcryptPasswordHasher
+    participant T as JwtTokenIssuer
 
     P->>C: POST /auth/login {phone, password}
-    C->>S: authenticate(command)
-    S->>R: findByPhone(phone)
+    C->>S: authenticate(AuthenticateCommand)
+    S->>R: findByPhone(Phone.of(phone))
     Note over S,H: Se o telefone não existe, compara com um hash descartável<br/>para igualar o tempo de resposta (RN06)
     S->>H: matches(password, hash)
     alt credenciais inválidas
@@ -90,15 +93,16 @@ sequenceDiagram
     participant C as ExamController
     participant S as SearchExamsService
     participant R as ExamOfferRepository (SQL)
-    participant D as ExamOffer / ExamSort / GeoPoint (domínio)
+    participant D as ExamOffer / ExamSort / GeoPoint (model)
 
-    P->>C: GET /exams/search?query&category&sort_by&lat&lng
-    C->>S: search(query)
+    P->>C: GET /exams/search?query&category&sort_by&lat&lng&neighborhood&min_price&max_price&min_rating&best_price_only
+    C->>S: search(SearchExamsQuery)
     S->>D: ExamCategory.parse(), ExamSort.parse(), new GeoPoint(lat,lng)
     D-->>S: valida — sort=distance sem lat e lng gera LOCATION_REQUIRED (400)
     S->>R: findAvailable(texto, categoria)
     Note over R: Uma consulta: funções de janela calculam<br/>AVG e MIN por tipo de exame, unaccent na busca
     R-->>S: ofertas com average_price e min_price
+    S->>S: filtra por bairro, faixa de preço, nota mínima e melhor preço
     loop para cada oferta
         S->>D: distanceKmFrom(origem) — Haversine
     end
@@ -116,25 +120,32 @@ sequenceDiagram
     actor P as Paciente (app)
     participant C as ContactController
     participant S as RegisterContactService
-    participant L as CatalogContactableExamLookup
-    participant K as GetExamDetailsUseCase (catálogo)
-    participant W as WhatsAppLinkBuilder (domínio)
+    participant L as ContactableExamLookup
+    participant K as GetExamDetailsService
+    participant W as WhatsAppLinkBuilder (model)
     participant E as ContactEventRepository
+    participant SC as SavingsController
+    participant GS as GetSavingsService
 
     P->>C: POST /exams/{id}/contacts (token opcional)
     C->>C: userId = sub do JWT, ou null para visitante
     C->>S: register(examId, userId)
     S->>L: findById(examId)
-    L->>K: getById(examId) — porta pública do catálogo
-    K-->>L: oferta (preço, economia, WhatsApp)
-    L-->>S: ContactableExam (vocabulário do módulo engagement)
+    L->>K: getById(examId, null, null) — reutiliza o service do catálogo
+    K-->>L: ExamDetails (oferta com preço, economia e WhatsApp)
+    L-->>S: ContactableExam (só o que o contato usa)
+    Note over L,S: EXAM_NOT_FOUND (404) se a oferta não existe
     S->>W: build(whatsapp, nome, preço)
     W-->>S: https://wa.me/55...?text=<mensagem codificada>
-    S->>E: save(ContactEvent com preço e economia congelados)
+    S->>E: save(ContactEvent.of(...) com preço e economia congelados)
+    S-->>C: ContactResult
     C-->>P: 201 {contact_id, whatsapp_url, estimated_savings}
     Note over P: O app abre o link com url_launcher
-    P->>C: GET /me/savings
-    C-->>P: {total_savings: soma dos estimated_savings do usuário}
+    P->>SC: GET /me/savings
+    SC->>GS: getSavings(userId do JWT)
+    GS->>E: summarizeByUser(userId)
+    E-->>GS: SavingsSummary
+    SC-->>P: 200 {total_savings, contacts_count}
 ```
 
 ## 5. Avaliar clínica (UC10)
@@ -145,7 +156,7 @@ sequenceDiagram
     actor P as Paciente (app)
     participant C as ReviewController
     participant S as ReviewClinicService
-    participant D as Review / RatingStats (domínio)
+    participant D as Review / RatingStats (model)
     participant R as ReviewRepository (SQL)
 
     P->>C: PUT /clinics/{id}/reviews/me {rating, comment}
@@ -174,7 +185,7 @@ sequenceDiagram
     actor P as Paciente (app)
     participant C as MeController
     participant S as ManageProfileService
-    participant D as AvatarImage (domínio)
+    participant D as AvatarImage (model)
     participant A as LocalAvatarStorage
     participant R as UserRepository
 
@@ -183,6 +194,7 @@ sequenceDiagram
     S->>D: AvatarImage.of(bytes)
     Note over D: Detecta PNG/JPEG pelos bytes iniciais<br/>e rejeita arquivos > 2 MB (RN34)
     D-->>S: imagem válida ou INVALID_AVATAR (400)
+    S->>R: findById(userId)
     S->>A: save(userId, image) → /files/avatars/<id>-<rand>.png
     S->>R: save(user com novo avatar_url)
     S->>A: delete(foto anterior)
