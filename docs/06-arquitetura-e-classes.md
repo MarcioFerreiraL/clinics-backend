@@ -2,85 +2,194 @@
 
 ## 1. Estilo arquitetural
 
-**Arquitetura hexagonal (portas e adaptadores), organizada por funcionalidade** (*package by feature*). O domínio não depende de Spring, JPA nem HTTP; as dependências apontam sempre para dentro.
+**Arquitetura em camadas** (*layered*): cada requisição desce por `controller` → `service` → `repository`, e nunca sobe. As classes de `model` (entidades, objetos de valor e regras de negócio) e de `dto` (comandos e resultados) são compartilhadas pelas camadas.
 
 ```mermaid
-flowchart LR
-    subgraph IN["Adaptadores de entrada"]
-        REST["Controllers REST<br/>(DTOs + validação)"]
+flowchart TB
+    CLI["App / cliente HTTP"]
+    subgraph CTRL["controller"]
+        REST["Controllers REST<br/>(@RestController, validação, DTOs de resposta)"]
     end
-    subgraph APP["Aplicação"]
-        UCS["Casos de uso<br/>(services @Transactional)"]
-        PIN["Portas de entrada<br/>(interfaces)"]
-        POUT["Portas de saída<br/>(repositórios, storage, token)"]
+    subgraph SVC["service"]
+        S["Services<br/>(@Service, @Transactional, orquestram as regras)"]
     end
-    subgraph DOM["Domínio"]
-        ENT["Entidades, objetos de valor<br/>e regras de negócio"]
+    subgraph REPO["repository"]
+        R["Repositórios<br/>(JdbcClient com SQL; Spring Data JPA para users)"]
     end
-    subgraph OUT["Adaptadores de saída"]
-        JPA["JPA e JDBC<br/>(PostgreSQL)"]
-        SEC["JWT / BCrypt"]
-        STO["Armazenamento de arquivos"]
+    DB[("PostgreSQL")]
+    subgraph SHARED["Compartilhados"]
+        M["model<br/>(entidades, records, regras)"]
+        D["dto<br/>(comandos, resultados, requests/responses)"]
     end
-    REST --> PIN
-    PIN -. implementado por .-> UCS
-    UCS --> ENT
-    UCS --> POUT
-    JPA -. implementa .-> POUT
-    SEC -. implementa .-> POUT
-    STO -. implementa .-> POUT
+    subgraph APOIO["Apoio técnico"]
+        SEC["security<br/>(JwtTokenIssuer, BcryptPasswordHasher)"]
+        STO["storage<br/>(LocalAvatarStorage)"]
+        EXC["exception<br/>(DomainException, GlobalExceptionHandler)"]
+    end
+    CLI --> REST
+    REST --> S
+    S --> R
+    R --> DB
+    S --> SEC
+    S --> STO
+    REST -.-> D
+    S -.-> M
+    S -.-> D
+    R -.-> M
 ```
 
-**Por que esta arquitetura:** as regras de negócio (RN14, RN15, RN19, RN22, RN27, RN28) ficam em classes puras, testáveis sem subir o Spring; trocar o armazenamento de fotos (disco → S3) afeta só um adaptador.
+- **controller**: recebe HTTP, aplica Bean Validation, extrai o id do usuário do JWT e converte o resultado do service em DTO de resposta.
+- **service**: uma classe por funcionalidade (`RegisterUserService`, `SearchExamsService`, ...). Define a transação e chama as regras de `model`.
+- **repository**: acesso ao banco. Só é chamado por services.
+- **model**: regras de negócio puras (ex.: `Phone.of`, `Review.create`, `RatingStats.average`), sem dependência de controller, service ou repository.
 
-### Estrutura de pacotes (como está no código)
+### 1.1. Estrutura de pacotes (como está no código)
 
 ```
 br.com.clinics
-├── shared/
-│   ├── domain/                   # DomainException e subtipos, PageResult
-│   └── infrastructure/
-│       ├── web/                  #   GlobalExceptionHandler (RFC 9457), FieldNames
-│       ├── openapi/              #   OpenApiConfig, SnakeCaseModelConverter
-│       └── ClockConfig           #   Clock injetável (fuso America/Recife)
-├── identity/                     # UC01, UC02, UC11, UC12
-│   ├── domain/                   #   User, Phone, Role, PasswordPolicy, AvatarImage
-│   ├── application/              #   RegisterUser, Authenticate, ManageProfile, ChangePassword
-│   │   └── port/{in,out}/        #   UserRepository, PasswordHasher, TokenIssuer, AvatarStorage
-│   └── infrastructure/
-│       ├── persistence/          #   UserJpaEntity, SpringDataUserRepository, UserPersistenceAdapter
-│       ├── security/             #   SecurityConfig, JwtTokenIssuer, BcryptPasswordHasher, JwtProperties
-│       ├── storage/              #   LocalAvatarStorage, StaticFilesConfig
-│       └── web/                  #   AuthController, MeController, DTOs
-├── catalog/                      # UC03, UC04, UC05, UC06
-│   ├── domain/                   #   ExamOffer, Clinic, OperatingHours, GeoPoint, ExamCategory, ExamSort, TrendingExam
-│   ├── application/              #   SearchExams, GetExamDetails, GetClinicProfile, GetTrendingExams
-│   └── infrastructure/
-│       ├── persistence/          #   consultas SQL (JdbcClient): ExamOffer, Clinic, Trending
-│       └── web/                  #   ExamController, ExamTypeController, ClinicController
-├── engagement/                   # UC07, UC08, UC09, UC10
-│   ├── domain/                   #   Review, RatingStats, ReviewerName, ContactEvent, WhatsAppLinkBuilder, ...
-│   ├── application/              #   RegisterContact, GetSavings, ManageFavorites, ReviewClinic
-│   └── infrastructure/
-│       ├── persistence/          #   JDBC + CatalogContactableExamLookup (adaptador anticorrupção)
-│       └── web/                  #   ContactController, SavingsController, FavoriteController, ReviewController
-└── ClinicsBackendApplication
+├── ClinicsBackendApplication
+├── config/           # ClockConfig (fuso America/Recife), JwtProperties, OpenApiConfig,
+│                     #   SiteConfig, SnakeCaseModelConverter, StaticFilesConfig, StorageProperties
+├── controller/       # AppDownloadController, AuthController, ClinicController, ContactController,
+│                     #   ExamController, ExamTypeController, FavoriteController, MeController,
+│                     #   NeighborhoodController, ReviewController, SavingsController, FieldNames
+├── dto/              # AuthDtos, ExamDtos, ProfileDtos (requests/responses);
+│                     #   AuthenticateCommand, ChangePasswordCommand, RegisterUserCommand,
+│                     #   UpdateProfileCommand, SearchExamsQuery; AuthResult, ClinicProfile,
+│                     #   ContactableExam, ContactResult, ExamDetails, IssuedToken, PageResult, SubmitResult
+├── exception/        # DomainException, AuthenticationFailedException, ConflictException,
+│                     #   NotFoundException, ValidationException, GlobalExceptionHandler (RFC 9457)
+├── model/            # AvatarImage, Clinic, ContactEvent, Cpf, ExamCategory, ExamOffer, ExamSearchItem,
+│                     #   ExamSort, FavoriteExam, GeoPoint, NeighborhoodSummary, OperatingHours,
+│                     #   PasswordPolicy, Phone, PublishedReview, RatingStats, Review, ReviewerName,
+│                     #   Role, SavingsSummary, TrendingExam, User, UserJpaEntity, WhatsAppLinkBuilder
+├── repository/       # ClinicRepository, ContactEventRepository, ExamOfferRepository, FavoriteRepository,
+│                     #   ReviewRepository, TrendingExamRepository, UserRepository, UserJpaRepository
+├── security/         # SecurityConfig, JwtTokenIssuer, BcryptPasswordHasher, ProblemDetailSecurityHandler
+├── service/          # AuthenticateService, ChangePasswordService, ContactableExamLookup,
+│                     #   GetClinicProfileService, GetExamDetailsService, GetSavingsService,
+│                     #   GetTrendingExamsService, ListNeighborhoodsService, ManageFavoritesService,
+│                     #   ManageProfileService, RegisterContactService, RegisterUserService,
+│                     #   ReviewClinicService, SearchExamsService, Paging
+└── storage/          # LocalAvatarStorage
 ```
 
-**Regras de dependência**, verificadas automaticamente por `ArchitectureTest` (ArchUnit):
-1. `domain` não importa Spring, JPA, Hibernate nem Jackson.
-2. `domain` não depende de `application` nem de `infrastructure`.
-3. `application` não depende de `infrastructure`.
+### 1.2. Por que camadas
 
-**Comunicação entre módulos:** `engagement` precisa de dados de uma oferta, mas não importa as classes do catálogo. Ele define a própria porta de saída (`ContactableExamLookup`) e o adaptador `CatalogContactableExamLookup` chama a porta pública `GetExamDetailsUseCase` do catálogo, traduzindo para o vocabulário do `engagement`. Consultas de leitura que cruzam tabelas de módulos diferentes (ex.: "em alta" lê `contact_events`) usam SQL direto, como modelos de leitura.
+O backend tem poucas regras de negócio: a maior parte das funcionalidades é ler o catálogo, gravar um contato, uma avaliação ou um favorito, e editar o perfil. Para esse tamanho, camadas são mais simples de navegar e de manter: há um pacote por papel técnico, o caminho de uma requisição é sempre o mesmo e não há interfaces com uma única implementação. As regras que existem continuam em `model`, testáveis sem subir o Spring. A direção das dependências é garantida pelo ArchUnit, então a simplicidade não vira acoplamento.
 
-## 2. Diagrama de classes do domínio
+### 1.3. Regras verificadas pelo ArchUnit
 
-O diagrama mostra as classes que existem no código, agrupadas por módulo.
+`src/test/java/br/com/clinics/ArchitectureTest.java` falha o build se alguma destas regras for quebrada:
 
-> **Diferenças em relação ao modelo conceitual do MER (doc 05):** no catálogo, `ExamType` + `Exam` aparecem unidos como o objeto de leitura `ExamOffer`, porque a Entrega 2 só lê o catálogo (a escrita de ofertas pertence à visão da clínica, fora do escopo). `PriceHistory` existe como tabela, mas não tem classe de domínio enquanto nada altera preços. Valores monetários usam `BigDecimal` direto.
+1. **Camadas** (`layeredArchitecture`, considerando só dependências entre as camadas):
+   - `controller` não é acessado por nenhuma camada;
+   - `service` só é acessado por `controller` e pelo próprio `service`;
+   - `repository` só é acessado por `service`.
+2. `model` não depende de `controller`, `service` nem `repository`.
+3. Não existem mais pacotes `port`, `application`, `infrastructure` ou `domain`.
+4. Classes `*Controller` ficam em `controller`; `*Service` em `service`; `*Repository` em `repository`.
 
-### 2.1. Módulo `identity`
+### 1.4. Comunicação entre áreas
+
+O registro de contato (engajamento) precisa de dados de uma oferta do catálogo. Em vez de ler as tabelas do catálogo de novo, `ContactableExamLookup` (pacote `service`) reutiliza `GetExamDetailsService.getById` e devolve só o que o contato usa: o record `ContactableExam` (id, nome, preço, economia e WhatsApp). Consultas de leitura que cruzam tabelas de áreas diferentes (ex.: "em alta" lê `contact_events`) usam SQL direto no repositório.
+
+## 2. Diagramas de classes
+
+Os diagramas mostram as classes que existem no código, agrupadas por área funcional. Em cada área há um diagrama das camadas (controller → service → repository) e um do `model`. Os métodos dos controllers são package-private; acessores, construtores e alguns campos descritivos (ex.: `description`, `city`, `logoUrl` em `Clinic`) foram omitidos para legibilidade.
+
+> **Diferenças em relação ao modelo conceitual do MER (doc 05):** no catálogo, `ExamType` + `Exam` aparecem unidos como o objeto de leitura `ExamOffer`, porque a Entrega 2 só lê o catálogo (a escrita de ofertas pertence à visão da clínica, fora do escopo). `PriceHistory` existe como tabela, mas não tem classe em `model` enquanto nada altera preços. Valores monetários usam `BigDecimal` direto.
+
+### 2.1. Identidade (cadastro, login e perfil)
+
+```mermaid
+classDiagram
+    direction LR
+    class AuthController {
+        -RegisterUserService register
+        -AuthenticateService authenticate
+        register(RegisterRequest) AuthResponse
+        login(LoginRequest) AuthResponse
+    }
+    class MeController {
+        -ManageProfileService profile
+        -ChangePasswordService password
+        get(Jwt) ProfileResponse
+        update(Jwt, UpdateProfileRequest) ProfileResponse
+        avatar(Jwt, MultipartFile) ProfileResponse
+        changePassword(Jwt, ChangePasswordRequest)
+    }
+    class RegisterUserService {
+        -UserRepository users
+        -BcryptPasswordHasher hasher
+        -JwtTokenIssuer tokens
+        -Clock clock
+        +register(RegisterUserCommand) AuthResult
+    }
+    class AuthenticateService {
+        -UserRepository users
+        -BcryptPasswordHasher hasher
+        -JwtTokenIssuer tokens
+        -String dummyHash
+        +authenticate(AuthenticateCommand) AuthResult
+    }
+    class ManageProfileService {
+        -UserRepository users
+        -LocalAvatarStorage avatars
+        -Clock clock
+        +getProfile(UUID) User
+        +updateProfile(UpdateProfileCommand) User
+        +changeAvatar(UUID, byte[]) User
+    }
+    class ChangePasswordService {
+        -UserRepository users
+        -BcryptPasswordHasher hasher
+        -Clock clock
+        +changePassword(ChangePasswordCommand)
+    }
+    class UserRepository {
+        -UserJpaRepository jpa
+        +findByPhone(Phone) Optional~User~
+        +existsByPhone(Phone) boolean
+        +existsByCpf(Cpf) boolean
+        +findById(UUID) Optional~User~
+        +existsByEmailExcluding(String, UUID) boolean
+        +save(User) User
+    }
+    class UserJpaRepository {
+        <<interface>>
+        +findByPhone(String) Optional~UserJpaEntity~
+        +existsByPhone(String) boolean
+        +existsByCpf(String) boolean
+        +existsByEmailIgnoreCaseAndIdNot(String, UUID) boolean
+    }
+    class JwtTokenIssuer {
+        +issue(User) IssuedToken
+    }
+    class BcryptPasswordHasher {
+        +hash(String) String
+        +matches(String, String) boolean
+    }
+    class LocalAvatarStorage {
+        +save(UUID, AvatarImage) String
+        +delete(String)
+    }
+    AuthController --> RegisterUserService : UC01
+    AuthController --> AuthenticateService : UC02
+    MeController --> ManageProfileService : UC11
+    MeController --> ChangePasswordService : UC12
+    RegisterUserService --> UserRepository
+    RegisterUserService --> BcryptPasswordHasher
+    RegisterUserService --> JwtTokenIssuer
+    AuthenticateService --> UserRepository
+    AuthenticateService --> BcryptPasswordHasher
+    AuthenticateService --> JwtTokenIssuer
+    ManageProfileService --> UserRepository
+    ManageProfileService --> LocalAvatarStorage
+    ChangePasswordService --> UserRepository
+    ChangePasswordService --> BcryptPasswordHasher
+    UserRepository --> UserJpaRepository : converte User ⇄ UserJpaEntity
+```
 
 ```mermaid
 classDiagram
@@ -88,16 +197,31 @@ classDiagram
     class User {
         -UUID id
         -Phone phone
+        -Cpf cpf
         -String email
         -String passwordHash
         -String fullName
         -Role role
         -LocalDate birthDate
         -String avatarUrl
-        +register(phone, fullName, hash, now)$ User
-        +updateProfile(name, email, birthDate, today, now)
+        -Instant createdAt
+        -Instant updatedAt
+        +register(phone, cpf, fullName, email, birthDate, passwordHash, today, now)$ User
+        +updateProfile(newFullName, newEmail, newBirthDate, today, now)
         +changePasswordHash(newHash, now)
-        +changeAvatar(url, now)
+        +changeAvatar(newAvatarUrl, now)
+    }
+    class UserJpaEntity {
+        <<entity JPA>>
+        -UUID id
+        -String phone
+        -String cpf
+        -String email
+        -String passwordHash
+        -String fullName
+        -Role role
+        -LocalDate birthDate
+        -String avatarUrl
     }
     class Role {
         <<enumeration>>
@@ -111,8 +235,15 @@ classDiagram
         +of(raw)$ Phone
         +formatted() String
     }
+    class Cpf {
+        <<record>>
+        +String digits
+        +of(raw)$ Cpf
+        +formatted() String
+    }
     class PasswordPolicy {
         <<utility>>
+        +int MIN_LENGTH$
         +validate(rawPassword)$
     }
     class AvatarImage {
@@ -120,15 +251,93 @@ classDiagram
         +byte[] bytes
         +String extension
         +String contentType
-        +of(bytes)$ AvatarImage
+        +int MAX_BYTES$
+        +of(data)$ AvatarImage
     }
     User --> Role
     User *-- Phone
-    User ..> PasswordPolicy : usa no cadastro
+    User *-- Cpf
+    User ..> PasswordPolicy : validada no service antes do cadastro
     User ..> AvatarImage : foto validada antes de gravar
+    UserJpaEntity ..> User : mapeado pelo UserRepository
 ```
 
-### 2.2. Módulo `catalog`
+### 2.2. Catálogo (busca, detalhes, clínica, bairros e em alta)
+
+```mermaid
+classDiagram
+    direction LR
+    class ExamController {
+        -SearchExamsService search
+        -GetExamDetailsService details
+        search(query, category, sortBy, lat, lng, page, size, neighborhood, minPrice, maxPrice, minRating, bestPriceOnly) SearchResponse
+        details(UUID, Double, Double) ExamDetailResponse
+    }
+    class ClinicController {
+        -GetClinicProfileService profile
+        get(UUID) ClinicProfileResponse
+    }
+    class ExamTypeController {
+        -GetTrendingExamsService trending
+        trending() List~TrendingResponse~
+    }
+    class NeighborhoodController {
+        -ListNeighborhoodsService neighborhoods
+        list() List~NeighborhoodResponse~
+    }
+    class SearchExamsService {
+        -ExamOfferRepository offers
+        +search(SearchExamsQuery) PageResult~ExamSearchItem~
+    }
+    class GetExamDetailsService {
+        -ExamOfferRepository offers
+        -ClinicRepository clinics
+        -Clock clock
+        +getById(UUID, Double, Double) ExamDetails
+    }
+    class GetClinicProfileService {
+        -ClinicRepository clinics
+        -ExamOfferRepository offers
+        -Clock clock
+        +getById(UUID) ClinicProfile
+    }
+    class GetTrendingExamsService {
+        -TrendingExamRepository trending
+        -Clock clock
+        +getTrending() List~TrendingExam~
+    }
+    class ListNeighborhoodsService {
+        -ClinicRepository clinics
+        +list() List~NeighborhoodSummary~
+    }
+    class ExamOfferRepository {
+        -JdbcClient jdbc
+        +findAvailable(String, ExamCategory) List~ExamOffer~
+        +findAvailableById(UUID) Optional~ExamOffer~
+        +findAvailableByClinic(UUID) List~ExamOffer~
+    }
+    class ClinicRepository {
+        -JdbcClient jdbc
+        +findById(UUID) Optional~Clinic~
+        +listNeighborhoods() List~NeighborhoodSummary~
+    }
+    class TrendingExamRepository {
+        -JdbcClient jdbc
+        +findTrending(Instant, int) List~TrendingExam~
+    }
+    ExamController --> SearchExamsService : UC03
+    ExamController --> GetExamDetailsService : UC04
+    ClinicController --> GetClinicProfileService : UC05
+    ExamTypeController --> GetTrendingExamsService : UC06
+    NeighborhoodController --> ListNeighborhoodsService
+    SearchExamsService --> ExamOfferRepository
+    GetExamDetailsService --> ExamOfferRepository
+    GetExamDetailsService --> ClinicRepository
+    GetClinicProfileService --> ClinicRepository
+    GetClinicProfileService --> ExamOfferRepository
+    GetTrendingExamsService --> TrendingExamRepository
+    ListNeighborhoodsService --> ClinicRepository
+```
 
 ```mermaid
 classDiagram
@@ -136,8 +345,16 @@ classDiagram
     class ExamOffer {
         <<record>>
         +UUID examId
+        +UUID examTypeId
         +String examName
         +ExamCategory category
+        +UUID clinicId
+        +String clinicName
+        +String neighborhood
+        +GeoPoint clinicLocation
+        +BigDecimal clinicRating
+        +boolean clinicVerified
+        +String whatsappNumber
         +BigDecimal price
         +BigDecimal averagePrice
         +BigDecimal minPrice
@@ -152,11 +369,13 @@ classDiagram
         +UUID id
         +String name
         +String address
+        +String neighborhood
         +GeoPoint location
         +String whatsappNumber
         +BigDecimal rating
         +int reviewCount
         +boolean verified
+        +List~OperatingHours~ operatingHours
         +isOpenAt(ZonedDateTime) boolean
     }
     class OperatingHours {
@@ -180,7 +399,7 @@ classDiagram
         CARDIO
         ULTRASSOM
         +label() String
-        +parse(text)$ ExamCategory
+        +parse(value)$ ExamCategory
     }
     class ExamSort {
         <<enumeration>>
@@ -188,7 +407,7 @@ classDiagram
         RATING
         NAME
         DISTANCE
-        +parse(text)$ ExamSort
+        +parse(value)$ ExamSort
         +comparator() Comparator
     }
     class ExamSearchItem {
@@ -200,9 +419,29 @@ classDiagram
         <<record>>
         +UUID examTypeId
         +String name
+        +String slug
+        +ExamCategory category
         +BigDecimal minPrice
         +int offersCount
         +long recentContacts
+    }
+    class NeighborhoodSummary {
+        <<record>>
+        +String name
+        +int clinicsCount
+    }
+    class ExamDetails {
+        <<record dto>>
+        +ExamOffer offer
+        +Clinic clinic
+        +boolean clinicOpenNow
+        +Double distanceKm
+    }
+    class ClinicProfile {
+        <<record dto>>
+        +Clinic clinic
+        +boolean openNow
+        +List~ExamOffer~ offers
     }
     ExamOffer --> ExamCategory
     ExamOffer o-- GeoPoint : localização da clínica
@@ -211,9 +450,101 @@ classDiagram
     ExamSearchItem *-- ExamOffer
     ExamSort ..> ExamSearchItem : ordena
     TrendingExam --> ExamCategory
+    ExamDetails *-- ExamOffer
+    ExamDetails *-- Clinic
+    ClinicProfile *-- Clinic
+    ClinicProfile o-- ExamOffer
 ```
 
-### 2.3. Módulo `engagement`
+### 2.3. Engajamento (contato, economia, favoritos e avaliações)
+
+```mermaid
+classDiagram
+    direction LR
+    class ContactController {
+        -RegisterContactService contact
+        register(UUID, Jwt) ContactResponse
+    }
+    class SavingsController {
+        -GetSavingsService savings
+        get(Jwt) SavingsResponse
+    }
+    class FavoriteController {
+        -ManageFavoritesService favorites
+        add(Jwt, UUID)
+        remove(Jwt, UUID)
+        list(Jwt, Integer, Integer) FavoritesResponse
+    }
+    class ReviewController {
+        -ReviewClinicService reviews
+        submit(Jwt, UUID, ReviewRequest) ResponseEntity~MyReviewResponse~
+        mine(Jwt, UUID) MyReviewResponse
+        list(UUID, Integer, Integer) ReviewsResponse
+    }
+    class RegisterContactService {
+        -ContactableExamLookup exams
+        -ContactEventRepository events
+        -Clock clock
+        +register(UUID examId, UUID userId) ContactResult
+    }
+    class ContactableExamLookup {
+        -GetExamDetailsService catalog
+        +findById(UUID) Optional~ContactableExam~
+    }
+    class GetExamDetailsService {
+        +getById(UUID, Double, Double) ExamDetails
+    }
+    class GetSavingsService {
+        -ContactEventRepository events
+        +getSavings(UUID) SavingsSummary
+    }
+    class ManageFavoritesService {
+        -FavoriteRepository favorites
+        +add(UUID, UUID)
+        +remove(UUID, UUID)
+        +list(UUID, Integer, Integer) PageResult~FavoriteExam~
+    }
+    class ReviewClinicService {
+        -ReviewRepository reviews
+        -Clock clock
+        +submit(UUID userId, UUID clinicId, int rating, String comment) SubmitResult
+        +list(UUID, Integer, Integer) PageResult~PublishedReview~
+        +getMine(UUID, UUID) Review
+    }
+    class ContactEventRepository {
+        -JdbcClient jdbc
+        +save(ContactEvent)
+        +summarizeByUser(UUID) SavingsSummary
+    }
+    class FavoriteRepository {
+        -JdbcClient jdbc
+        +examTypeExists(UUID) boolean
+        +add(UUID, UUID)
+        +remove(UUID, UUID)
+        +findByUser(UUID, int, int) List~FavoriteExam~
+        +countByUser(UUID) long
+    }
+    class ReviewRepository {
+        -JdbcClient jdbc
+        +clinicExists(UUID) boolean
+        +findByUserAndClinic(UUID, UUID) Optional~Review~
+        +save(Review)
+        +statsFor(UUID) RatingStats
+        +updateClinicRating(UUID, RatingStats)
+        +findByClinic(UUID, int, int) List~PublishedReview~
+        +countByClinic(UUID) long
+    }
+    ContactController --> RegisterContactService : UC07
+    SavingsController --> GetSavingsService : UC08
+    FavoriteController --> ManageFavoritesService : UC09
+    ReviewController --> ReviewClinicService : UC10
+    RegisterContactService --> ContactableExamLookup
+    RegisterContactService --> ContactEventRepository
+    ContactableExamLookup --> GetExamDetailsService : reutiliza o catálogo
+    GetSavingsService --> ContactEventRepository
+    ManageFavoritesService --> FavoriteRepository
+    ReviewClinicService --> ReviewRepository
+```
 
 ```mermaid
 classDiagram
@@ -224,8 +555,11 @@ classDiagram
         -UUID userId
         -int rating
         -String comment
+        -Instant createdAt
+        -Instant updatedAt
+        +int MAX_COMMENT_LENGTH$
         +create(clinicId, userId, rating, comment, now)$ Review
-        +edit(rating, comment, now)
+        +edit(newRating, newComment, now)
     }
     class RatingStats {
         <<record>>
@@ -246,6 +580,8 @@ classDiagram
         <<record>>
         +UUID examTypeId
         +String name
+        +String slug
+        +ExamCategory category
         +BigDecimal minPrice
         +int offersCount
         +Instant favoritedAt
@@ -257,6 +593,7 @@ classDiagram
         +UUID userId
         +BigDecimal priceAtContact
         +BigDecimal estimatedSavings
+        +Instant createdAt
         +of(examId, userId, price, savings, now)$ ContactEvent
     }
     class WhatsAppLinkBuilder {
@@ -267,22 +604,45 @@ classDiagram
         <<record>>
         +BigDecimal totalSavings
         +long contactsCount
+        +empty()$ SavingsSummary
+    }
+    class ContactableExam {
+        <<record dto>>
+        +UUID examId
+        +String examName
+        +BigDecimal price
+        +BigDecimal savings
+        +String whatsappNumber
+    }
+    class ContactResult {
+        <<record dto>>
+        +UUID contactId
+        +URI whatsappUrl
+        +BigDecimal estimatedSavings
+    }
+    class SubmitResult {
+        <<record dto>>
+        +Review review
+        +boolean created
     }
     PublishedReview *-- Review
     PublishedReview ..> ReviewerName : abrevia o autor
     Review ..> RatingStats : base da nota média
-    ContactEvent ..> WhatsAppLinkBuilder : gerado junto com o link
+    SubmitResult *-- Review
+    ContactEvent ..> ContactableExam : preço e economia congelados
+    ContactResult ..> WhatsAppLinkBuilder : whatsappUrl
     SavingsSummary ..> ContactEvent : soma
 ```
 
-### 2.4. Exceções de domínio
+### 2.4. Exceções
 
 ```mermaid
 classDiagram
     direction LR
     class DomainException {
         <<abstract>>
-        +String code()
+        -String code
+        +code() String
     }
     class ValidationException
     class ConflictException
@@ -294,49 +654,23 @@ classDiagram
     DomainException <|-- AuthenticationFailedException : HTTP 401
 ```
 
-O `GlobalExceptionHandler` converte cada subtipo em `application/problem+json` com o `code` da exceção.
+O `GlobalExceptionHandler` converte cada subtipo em `application/problem+json` com o `code` da exceção. Erros 401 e 403 do Spring Security saem no mesmo formato pelo `ProblemDetailSecurityHandler`.
 
-## 3. Casos de uso e controllers
+## 3. Controllers e services
 
-```mermaid
-classDiagram
-    direction LR
-    class AuthController
-    class MeController
-    class ExamController
-    class ExamTypeController
-    class ClinicController
-    class ContactController
-    class SavingsController
-    class FavoriteController
-    class ReviewController
-
-    class RegisterUserUseCase { <<interface>> }
-    class AuthenticateUseCase { <<interface>> }
-    class ManageProfileUseCase { <<interface>> }
-    class ChangePasswordUseCase { <<interface>> }
-    class SearchExamsUseCase { <<interface>> }
-    class GetExamDetailsUseCase { <<interface>> }
-    class GetClinicProfileUseCase { <<interface>> }
-    class GetTrendingExamsUseCase { <<interface>> }
-    class RegisterContactUseCase { <<interface>> }
-    class GetSavingsUseCase { <<interface>> }
-    class ManageFavoritesUseCase { <<interface>> }
-    class ReviewClinicUseCase { <<interface>> }
-
-    AuthController --> RegisterUserUseCase : UC01
-    AuthController --> AuthenticateUseCase : UC02
-    MeController --> ManageProfileUseCase : UC11
-    MeController --> ChangePasswordUseCase : UC12
-    ExamController --> SearchExamsUseCase : UC03
-    ExamController --> GetExamDetailsUseCase : UC04
-    ClinicController --> GetClinicProfileUseCase : UC05
-    ExamTypeController --> GetTrendingExamsUseCase : UC06
-    ContactController --> RegisterContactUseCase : UC07
-    SavingsController --> GetSavingsUseCase : UC08
-    FavoriteController --> ManageFavoritesUseCase : UC09
-    ReviewController --> ReviewClinicUseCase : UC10
-```
+| Controller | Service | UC (doc de requisitos) |
+|---|---|---|
+| `AuthController` | `RegisterUserService`, `AuthenticateService` | UC01, UC02 |
+| `MeController` | `ManageProfileService`, `ChangePasswordService` | UC11, UC12 |
+| `ExamController` | `SearchExamsService`, `GetExamDetailsService` | UC03, UC04 |
+| `ClinicController` | `GetClinicProfileService` | UC05 |
+| `ExamTypeController` | `GetTrendingExamsService` | UC06 |
+| `NeighborhoodController` | `ListNeighborhoodsService` | filtro de bairros da busca |
+| `ContactController` | `RegisterContactService` | UC07 |
+| `SavingsController` | `GetSavingsService` | UC08 |
+| `FavoriteController` | `ManageFavoritesService` | UC09 |
+| `ReviewController` | `ReviewClinicService` | UC10 |
+| `AppDownloadController` | (nenhum; lê o APK do disco) | download do app Android |
 
 ## 4. Decisões técnicas e bibliotecas
 
@@ -348,7 +682,7 @@ classDiagram
 | Migrações | Flyway | Esquema versionado e reprodutível; Hibernate só valida (`ddl-auto=validate`) |
 | JWT | Spring Security OAuth2 Resource Server (Nimbus) | Validação mantida pelo Spring Security, sem biblioteca extra |
 | Senhas | `BCryptPasswordEncoder`, custo 10 | RNF01 |
-| Validação | Jakarta Bean Validation + regras no domínio | Formato nos DTOs; regras de negócio nas entidades |
+| Validação | Jakarta Bean Validation + regras em `model` | Formato nos DTOs; regras de negócio nas classes de `model` |
 | DTOs | `record` do Java | Imutáveis e concisos |
 | Documentação da API | springdoc-openapi 3.1 | Swagger UI e contrato em `/v3/api-docs` |
 | Erros | `ProblemDetail` (RFC 9457) + `@RestControllerAdvice` | RNF07 |
@@ -357,15 +691,19 @@ classDiagram
 | Infra local | Docker Compose (PostgreSQL 17) | RNF10 |
 
 ### Por que JPA e JDBC juntos
-`users` é um agregado pequeno com ciclo de vida de criação e edição, bem atendido por JPA. As consultas do catálogo e do engajamento são de leitura, agregam entre tabelas e usam recursos do PostgreSQL; escrevê-las em SQL deixa a intenção explícita e evita projeções JPA artificiais. Ambas ficam atrás de portas de saída, então o restante do sistema não sabe qual tecnologia é usada.
+`users` é um agregado pequeno com ciclo de vida de criação e edição, bem atendido por JPA: `UserRepository` usa o `UserJpaRepository` (Spring Data) e converte `UserJpaEntity` em `User`, então os services nunca veem a entidade JPA. As consultas do catálogo e do engajamento são de leitura, agregam entre tabelas e usam recursos do PostgreSQL; escrevê-las em SQL (`JdbcClient`) deixa a intenção explícita e evita projeções JPA artificiais. Os services só conhecem as classes `*Repository`, não a tecnologia por trás delas.
 
 ## 5. Estratégia de testes
 
 | Nível | O que cobre | Ferramenta |
 |---|---|---|
-| Unidade | Regras de negócio puras (RN03, RN14, RN15, RN19, RN22, RN25–RN28, RN34) | JUnit 5 + AssertJ, sem Spring |
+| Unidade | Regras de negócio puras em `model` (RN03, RN14, RN15, RN19, RN22, RN25–RN28, RN34) | JUnit 5 + AssertJ, sem Spring |
 | Integração | Cada endpoint com a aplicação completa e PostgreSQL real | `@SpringBootTest` + MockMvc + Testcontainers |
-| Arquitetura | Regras de dependência entre camadas | ArchUnit |
+| Arquitetura | Direção controller → service → repository e nomes das classes (seção 1.3) | ArchUnit |
 | Contrato | Endpoints presentes no OpenAPI e nomes em `snake_case` | MockMvc em `/v3/api-docs` |
 
 Os testes de integração criam os próprios usuários com telefone aleatório e, quando alteram o seed, restauram o estado ao final.
+
+## 6. Histórico
+
+O projeto começou com arquitetura hexagonal organizada por módulos. Em outubro de 2026 foi migrado para camadas, para simplificar a navegação e a manutenção. O contrato da API (rotas, JSON e códigos de erro) não mudou.

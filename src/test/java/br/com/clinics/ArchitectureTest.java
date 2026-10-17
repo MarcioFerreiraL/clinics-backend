@@ -5,26 +5,44 @@ import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
 
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
+import static com.tngtech.archunit.library.Architectures.layeredArchitecture;
 
-/** Garante as regras de dependência da arquitetura hexagonal (docs/06-arquitetura-e-classes.md). */
+/** Garante a arquitetura em camadas controller → service → repository (docs/06-arquitetura-e-classes.md). */
 @AnalyzeClasses(packages = "br.com.clinics", importOptions = ImportOption.DoNotIncludeTests.class)
 class ArchitectureTest {
 
     @ArchTest
-    static final ArchRule domainDoesNotDependOnFrameworks = noClasses()
-            .that().resideInAPackage("..domain..")
-            .should().dependOnClassesThat().resideInAnyPackage(
-                    "org.springframework..", "jakarta.persistence..", "org.hibernate..", "tools.jackson..", "com.fasterxml..");
+    static final ArchRule layers = layeredArchitecture().consideringOnlyDependenciesInLayers()
+            .layer("Controller").definedBy("..controller..")
+            .layer("Service").definedBy("..service..")
+            .layer("Repository").definedBy("..repository..")
+            .whereLayer("Controller").mayNotBeAccessedByAnyLayer()
+            .whereLayer("Service").mayOnlyBeAccessedByLayers("Controller", "Service")
+            .whereLayer("Repository").mayOnlyBeAccessedByLayers("Service");
 
     @ArchTest
-    static final ArchRule domainDoesNotDependOnOuterLayers = noClasses()
-            .that().resideInAPackage("..domain..")
-            .should().dependOnClassesThat().resideInAnyPackage("..application..", "..infrastructure..");
+    static final ArchRule modelDoesNotDependOnLayers = noClasses()
+            .that().resideInAPackage("..model..")
+            .should().dependOnClassesThat().resideInAnyPackage("..controller..", "..service..", "..repository..");
 
     @ArchTest
-    static final ArchRule applicationDoesNotDependOnInfrastructure = noClasses()
-            .that().resideInAPackage("..application..")
-            .should().dependOnClassesThat().resideInAPackage("..infrastructure..")
-            .allowEmptyShould(true);
+    static final ArchRule noHexagonalPackagesLeft = noClasses()
+            .should().resideInAnyPackage("..port..", "..application..", "..infrastructure..", "..domain..");
+
+    @ArchTest
+    static final ArchRule controllersAreNamedAndPlaced = classes()
+            .that().haveSimpleNameEndingWith("Controller")
+            .should().resideInAPackage("..controller..");
+
+    @ArchTest
+    static final ArchRule servicesAreNamedAndPlaced = classes()
+            .that().haveSimpleNameEndingWith("Service")
+            .should().resideInAPackage("..service..");
+
+    @ArchTest
+    static final ArchRule repositoriesAreNamedAndPlaced = classes()
+            .that().haveSimpleNameEndingWith("Repository")
+            .should().resideInAPackage("..repository..");
 }
