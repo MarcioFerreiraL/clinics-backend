@@ -27,13 +27,18 @@ Em cidades pequenas, descobrir quanto cada clínica cobra por um exame exige lig
 
 ## Arquitetura
 
-Hexagonal (portas e adaptadores), organizada por funcionalidade em três módulos:
+Em camadas: **controller → service → repository**.
 
-- **`identity`**: cadastro, login, perfil, foto e senha.
-- **`catalog`**: busca e comparação, detalhes, perfil da clínica e exames em alta.
-- **`engagement`**: contato por WhatsApp, economia, favoritos e avaliações.
+| Pacote | Responsabilidade |
+|---|---|
+| `controller` | Endpoints REST: recebem a requisição, validam a entrada e devolvem DTOs |
+| `service` | Regras de negócio: cadastro e login, busca e comparação, contatos, favoritos, avaliações e economia |
+| `repository` | Acesso ao PostgreSQL: SQL com `JdbcClient` nas consultas e Spring Data JPA para usuários |
+| `model` | Objetos de negócio (exame, clínica, usuário, avaliação…) e suas validações |
+| `dto` | Formatos de entrada e saída da API |
+| `config`, `security`, `exception`, `storage` | Configuração, JWT e senhas, tratamento de erros e fotos de perfil |
 
-O domínio não depende de Spring nem de JPA, e essa regra é verificada por um teste de arquitetura (ArchUnit). Detalhes, diagramas de classes e a estrutura de pacotes em [`docs/06-arquitetura-e-classes.md`](docs/06-arquitetura-e-classes.md).
+A direção das dependências é verificada por um teste de arquitetura (ArchUnit): controller só chama service, service só chama repository, e nenhuma camada de baixo conhece a de cima. Detalhes, diagramas de classes e a estrutura de pacotes em [`docs/06-arquitetura-e-classes.md`](docs/06-arquitetura-e-classes.md).
 
 ## Como executar
 
@@ -119,7 +124,7 @@ erDiagram
 | [`03-regras-de-negocio.md`](docs/03-regras-de-negocio.md) | Regras de negócio numeradas (RN01 a RN36) |
 | [`04-casos-de-uso.md`](docs/04-casos-de-uso.md) | Diagrama e especificação dos casos de uso |
 | [`05-modelo-de-dados.md`](docs/05-modelo-de-dados.md) | MER, dicionário de dados e migrações |
-| [`06-arquitetura-e-classes.md`](docs/06-arquitetura-e-classes.md) | Arquitetura hexagonal e diagramas de classes |
+| [`06-arquitetura-e-classes.md`](docs/06-arquitetura-e-classes.md) | Arquitetura em camadas e diagramas de classes |
 | [`07-referencia-da-api.md`](docs/07-referencia-da-api.md) | Endpoints com exemplos reais e catálogo de erros |
 | [`08-diagramas-de-sequencia.md`](docs/08-diagramas-de-sequencia.md) | Fluxos principais de ponta a ponta |
 
