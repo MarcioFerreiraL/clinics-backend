@@ -19,6 +19,8 @@ Este documento é a base das migrações Flyway. **Nenhuma tabela é criada sem 
 | D11 | **Distância calculada com Haversine em SQL**, sem PostGIS. | Para ≤ 5 mil ofertas em uma cidade, o custo é irrelevante. PostGIS fica como evolução se houver escala regional. |
 | D12 | **Sem exclusão física de avaliações e contatos de usuários**: `ON DELETE SET NULL` em `contact_events.user_id`. | Preserva métricas agregadas após a exclusão de conta (RF20). |
 | D13 | **Tabela de refresh token fica para a Entrega 3.** | A sessão de 1 h basta para a Entrega 2. |
+| D14 | **A oferta pode substituir a descrição genérica do catálogo.** | Cada clínica apresenta a descrição do seu próprio serviço sem quebrar a comparação por tipo de exame. |
+| D15 | **Aberturas de detalhes ficam em `exam_view_events`.** | Permite medir visualizações anônimas e autenticadas por clínica sem contar consultas da busca como abertura. |
 
 ## 2. Modelo conceitual
 
@@ -36,7 +38,9 @@ erDiagram
     CLINIC ||--o{ CLINIC_OPERATING_HOURS : "funciona em"
     EXAM ||--o{ PRICE_HISTORY : "tem"
     EXAM ||--o{ CONTACT_EVENT : "motiva"
-    USER |o--o| CLINIC : "administra (E3)"
+    EXAM ||--o{ EXAM_VIEW_EVENT : "recebe aberturas"
+    EXAM_TYPE ||--o{ EXAM_TYPE_ALIAS : "tem nomes populares"
+    USER |o--o| CLINIC : administra
 ```
 
 **Cardinalidades:**
@@ -44,7 +48,7 @@ erDiagram
 - Uma clínica tem várias ofertas; cada oferta pertence a uma clínica e a um tipo de exame.
 - Um usuário avalia uma clínica no máximo uma vez (N:N com restrição de unicidade em `reviews`).
 - Um contato pode ser anônimo (`user_id` nulo, para visitantes).
-- `USER |o--o| CLINIC` é a posse da clínica pelo gestor, usada só na Entrega 3 (RBAC).
+- `USER |o--o| CLINIC` é o vínculo opcional do gerente com uma única clínica, usado na autorização das rotas de gestão.
 
 ## 3. Modelo lógico
 
@@ -66,7 +70,7 @@ erDiagram
 
     clinics {
         uuid id PK
-        uuid owner_user_id FK "opcional, E3"
+        uuid owner_user_id FK "opcional, gerente da clínica"
         varchar name
         text description
         varchar address
@@ -103,11 +107,18 @@ erDiagram
         timestamptz created_at
     }
 
+    exam_type_aliases {
+        uuid id PK
+        uuid exam_type_id FK
+        varchar alias
+    }
+
     exams {
         uuid id PK
         uuid clinic_id FK
         uuid exam_type_id FK
         numeric price "10,2"
+        text description "opcional, sobrescreve descrição genérica"
         varchar preparation
         varchar payment_methods
         boolean available
@@ -147,16 +158,24 @@ erDiagram
         timestamptz created_at
     }
 
+    exam_view_events {
+        uuid id PK
+        uuid exam_id FK
+        timestamptz created_at
+    }
+
     users |o--o| clinics : "owner_user_id"
     clinics ||--o{ clinic_operating_hours : "clinic_id"
     clinics ||--o{ exams : "clinic_id"
     exam_types ||--o{ exams : "exam_type_id"
+    exam_types ||--o{ exam_type_aliases : "exam_type_id"
     users ||--o{ favorites : "user_id"
     exam_types ||--o{ favorites : "exam_type_id"
     clinics ||--o{ reviews : "clinic_id"
     users ||--o{ reviews : "user_id"
     exams ||--o{ price_history : "exam_id"
     exams ||--o{ contact_events : "exam_id"
+    exams ||--o{ exam_view_events : "exam_id"
     users |o--o{ contact_events : "user_id"
 ```
 
@@ -170,6 +189,7 @@ erDiagram
 | `users` | `CHECK (role IN ('PATIENT','CLINIC_MANAGER','ADMIN'))` | RN05 |
 | `clinics` | `CHECK (rating BETWEEN 0 AND 5)` | Integridade |
 | `clinics` | `owner_user_id` com `ON DELETE SET NULL` | Excluir o gestor não apaga a clínica |
+| `clinics` | índice único parcial em `owner_user_id` | Um gerente administra no máximo uma clínica |
 | `clinic_operating_hours` | `UNIQUE (clinic_id, day_of_week, opens_at)`, `CHECK (day_of_week BETWEEN 1 AND 7)`, `CHECK (closes_at > opens_at)` | RN22 |
 | `exam_types` | `UNIQUE (slug)`, `UNIQUE (name)`, `CHECK (category IN (...))` | RN09, RN10 |
 | `exams` | `UNIQUE (clinic_id, exam_type_id)` | RN09 |
@@ -182,6 +202,7 @@ erDiagram
 | `price_history` | índice `(exam_id, recorded_at DESC)` | Gráfico e último preço |
 | `contact_events` | índice `(created_at DESC)` e `(exam_id, created_at DESC)` | Ranking da semana |
 | `contact_events` | índice `(user_id)` | Total economizado |
+| `exam_view_events` | índice `(exam_id, created_at DESC)` | Contagem de aberturas por clínica e período |
 
 **Extensões:** `unaccent` (busca sem acento, RN16) e `pgcrypto` ou `gen_random_uuid()` nativo (PostgreSQL ≥ 13).
 
@@ -226,6 +247,7 @@ erDiagram
 | exam_types.category | varchar(20) | não | enum |
 | exam_types.description | text | sim | explicação genérica do procedimento |
 | exams.price | numeric(10,2) | não | |
+| exams.description | text | sim | descrição da oferta; quando nula, usa `exam_types.description` |
 | exams.preparation | varchar(255) | sim | "Jejum 8h • Laudo em 24h" |
 | exams.payment_methods | varchar(255) | sim | |
 | exams.available | boolean | não | padrão true |
@@ -274,11 +296,12 @@ O modelo está na **3ª forma normal**, com uma desnormalização deliberada (D6
 | V7 | `V7__add_cpf_to_users.sql` | Coluna `cpf` e índice único parcial |
 | V8 | `V8__surubim_demo_clinics.sql` | Clínicas de demonstração ambientadas em Surubim, com nomes e bairros alterados |
 | V9 | `V9__exam_type_aliases.sql` | Tabela `exam_type_aliases` com os nomes populares dos exames |
+| V10 | `V10__clinic_management_and_exam_views.sql` | Descrição por oferta, vínculo único de gerente e eventos de abertura dos detalhes |
 
-O banco tem **9 tabelas de domínio**: `users`, `clinics`, `clinic_operating_hours`, `exam_types`, `exams`, `favorites`, `reviews`, `price_history` e `contact_events`. As colunas e restrições do esquema real seguem o modelo lógico da seção 3, com duas particularidades: `reviews` ganhou `updated_at` (reavaliar altera a data) e `exams` não tem contador de visualizações (o "em alta" usa contatos).
+O banco tem **11 tabelas de domínio**: `users`, `clinics`, `clinic_operating_hours`, `exam_types`, `exam_type_aliases`, `exams`, `favorites`, `reviews`, `price_history`, `contact_events` e `exam_view_events`. As aberturas são eventos por requisição bem-sucedida a `GET /exams/{id}`, não usuários únicos; contatos são contados por solicitação de redirecionamento ao WhatsApp.
 
-`price_history` recebe uma linha por oferta no seed, mas nenhuma funcionalidade do paciente altera preços. O registro automático em cada mudança (RN13) entra junto com a visão da clínica.
+`price_history` recebe uma linha por oferta no seed e uma nova linha quando a clínica altera o preço.
 
-## 9. Tabelas da Entrega 3 (não criar agora)
+## 9. Tabelas futuras
 
 `refresh_tokens`, `password_reset_tokens`, `search_history`, `consents`.

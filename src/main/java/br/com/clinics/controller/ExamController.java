@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 import br.com.clinics.service.GetExamDetailsService;
+import br.com.clinics.service.RecordExamViewService;
 import br.com.clinics.service.SearchExamsService;
 import br.com.clinics.dto.SearchExamsQuery;
 import br.com.clinics.dto.ExamDtos.ExamDetailResponse;
@@ -24,10 +25,12 @@ public class ExamController {
 
     private final SearchExamsService search;
     private final GetExamDetailsService details;
+    private final RecordExamViewService views;
 
-    public ExamController(SearchExamsService search, GetExamDetailsService details) {
+    public ExamController(SearchExamsService search, GetExamDetailsService details, RecordExamViewService views) {
         this.search = search;
         this.details = details;
+        this.views = views;
     }
 
     @GetMapping("/search")
@@ -53,6 +56,8 @@ public class ExamController {
     @Operation(summary = "Detalhes de uma oferta de exame (UC04)")
     ExamDetailResponse details(@PathVariable UUID id, @RequestParam(required = false) Double lat,
             @RequestParam(required = false) Double lng) {
-        return ExamDetailResponse.from(details.getById(id, lat, lng));
+        var result = details.getById(id, lat, lng);
+        views.record(id);
+        return ExamDetailResponse.from(result);
     }
 }

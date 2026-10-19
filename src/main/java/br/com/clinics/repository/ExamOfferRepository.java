@@ -26,7 +26,7 @@ public class ExamOfferRepository {
     private static final String BASE = """
             WITH offers AS (
                 SELECT e.id AS exam_id, t.id AS exam_type_id, t.name AS exam_name, t.category,
-                       t.description AS exam_description,
+                       COALESCE(e.description, t.description) AS exam_description,
                        c.id AS clinic_id, c.name AS clinic_name, c.neighborhood, c.latitude, c.longitude,
                        c.rating, c.is_verified, c.whatsapp_number, c.logo_url,
                        e.price, e.preparation, e.payment_methods,
