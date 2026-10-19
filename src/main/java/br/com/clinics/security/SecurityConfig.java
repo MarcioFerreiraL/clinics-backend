@@ -55,7 +55,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/exams/**", "/api/v1/exam-types/**", "/api/v1/clinics/**", "/api/v1/neighborhoods").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/exams/*/contacts").permitAll()
                         .requestMatchers(HttpMethod.GET, "/files/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/", "/index.html", "/logo.png", "/favicon.png", "/docs", "/app", "/app/**", "/download/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/", "/index.html", "/logo.png", "/favicon.png", "/qr-android.svg", "/qr-app.svg", "/docs", "/app", "/app/**", "/download/**").permitAll()
                         .requestMatchers("/actuator/health/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth -> oauth

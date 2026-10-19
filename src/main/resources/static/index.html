@@ -42,6 +42,34 @@
     .feat b { display:block; color:var(--blue-deep); margin-bottom:4px; }
     .note { font-size:13px; margin-top:-2px; }
     .btn.off { background:var(--line); color:var(--muted); pointer-events:none; }
+    section.qr { padding: 32px 0 4px; }
+    .qr-head { display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:12px; margin-bottom:14px; }
+    .qr-head h2 { font-size:22px; margin:0; }
+    .qr-head p { margin:2px 0 0; color:var(--muted); font-size:15px; }
+    .qr-head .btn { margin-top:0; }
+    .qr-grid { display:grid; gap:16px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+    .qr-card { border:1px solid var(--line); border-radius:16px; padding:20px; text-align:center; background:#fff; }
+    .qr-card.android { background: var(--mist); border-color: var(--blue-soft); }
+    .qr-card.app { background: var(--mint-soft); border-color: var(--mint); }
+    .qr-card img { width:100%; max-width:220px; aspect-ratio:1; display:block; margin:0 auto 12px;
+                   background:#fff; border-radius:12px; padding:8px; }
+    .qr-card h3 { margin:0; font-size:19px; }
+    .qr-card p { margin:4px 0 0; color:var(--muted); font-size:14px; }
+    .qr-card code { font-size:13px; color:var(--blue-deep); word-break:break-all; }
+    /* Modo apresentação: os QR codes ocupam a tela para o público escanear. */
+    #stage { position:fixed; inset:0; background:#fff; z-index:10; display:none; flex-direction:column;
+             align-items:center; justify-content:center; padding:24px; gap:2vh; }
+    #stage.open { display:flex; }
+    #stage .stage-title { font-size:clamp(22px, 4vw, 40px); font-weight:800; margin:0; text-align:center; }
+    #stage .stage-sub { color:var(--muted); font-size:clamp(15px, 2vw, 22px); margin:0; text-align:center; }
+    #stage .qr-grid { width:100%; max-width:1100px; grid-template-columns: repeat(2, 1fr); gap:3vw; }
+    #stage .qr-card { padding:2.5vh 2vw; }
+    #stage .qr-card img { max-width:min(38vw, 56vh); }
+    #stage .qr-card h3 { font-size:clamp(20px, 3vw, 34px); }
+    #stage .qr-card p { font-size:clamp(14px, 1.8vw, 20px); }
+    #stage .close { position:absolute; top:16px; right:16px; border:0; background:var(--line); color:var(--ink);
+                    font:inherit; font-weight:700; border-radius:12px; padding:10px 16px; cursor:pointer; }
+    @media (max-width: 640px) { #stage .qr-grid { grid-template-columns: 1fr; } #stage .qr-card img { max-width:60vw; } }
     footer { border-top:1px solid var(--line); margin-top:28px; padding: 22px 0 36px; color:var(--muted); font-size:14px;
              display:flex; flex-wrap:wrap; gap:8px 24px; justify-content:space-between; }
     footer a { color: var(--blue); text-decoration: none; font-weight:600; }
@@ -93,6 +121,30 @@
       </article>
     </div>
 
+    <section class="qr" id="qr">
+      <div class="qr-head">
+        <div>
+          <h2>Aponte a câmera do celular</h2>
+          <p>Escaneie o QR code da sua versão para baixar ou abrir o Clinics.</p>
+        </div>
+        <a class="btn" href="#apresentar" id="open-stage">Modo apresentação</a>
+      </div>
+      <div class="qr-grid">
+        <div class="qr-card android">
+          <img src="/qr-android.svg" alt="QR code para baixar o APK do Clinics para Android">
+          <h3>Android</h3>
+          <p>Baixa o APK do aplicativo</p>
+          <p><code>clinics.marciodev.com/download/clinics.apk</code></p>
+        </div>
+        <div class="qr-card app">
+          <img src="/qr-app.svg" alt="QR code para abrir a versão web do Clinics">
+          <h3>iPhone, iPad e web</h3>
+          <p>Abre o app no navegador; no Safari, adicione à Tela de Início</p>
+          <p><code>clinics.marciodev.com/app/</code></p>
+        </div>
+      </div>
+    </section>
+
     <section class="features">
       <h2>O que o Clinics faz</h2>
       <div class="feat">
@@ -111,7 +163,35 @@
     </footer>
   </div>
 
+  <div id="stage" role="dialog" aria-label="QR codes do Clinics">
+    <button class="close" type="button" id="close-stage">Fechar (Esc)</button>
+    <img src="/logo.png" alt="" style="width:clamp(64px, 9vh, 110px)">
+    <p class="stage-title">Baixe o Clinics</p>
+    <p class="stage-sub">Aponte a câmera do celular para o QR code da sua versão</p>
+    <div class="qr-grid">
+      <div class="qr-card android">
+        <img src="/qr-android.svg" alt="QR code do Android">
+        <h3>Android</h3>
+        <p>Baixa o APK do aplicativo</p>
+      </div>
+      <div class="qr-card app">
+        <img src="/qr-app.svg" alt="QR code do iPhone e web">
+        <h3>iPhone e web</h3>
+        <p>No Safari: Compartilhar → Adicionar à Tela de Início</p>
+      </div>
+    </div>
+  </div>
+
   <script>
+    // Modo apresentação: abre por clique ou pelo endereço /#apresentar.
+    var stage = document.getElementById('stage');
+    function syncStage() { stage.classList.toggle('open', location.hash === '#apresentar'); }
+    function closeStage() { history.replaceState(null, '', location.pathname); syncStage(); }
+    window.addEventListener('hashchange', syncStage);
+    document.getElementById('close-stage').addEventListener('click', closeStage);
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && stage.classList.contains('open')) closeStage(); });
+    syncStage();
+
     // Mostra o tamanho do APK ou avisa se ele ainda não foi publicado.
     fetch('/download/clinics.apk', { method: 'HEAD' }).then(function (r) {
       var info = document.getElementById('apk-info');

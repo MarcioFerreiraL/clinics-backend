@@ -102,6 +102,8 @@ class OpenApiIntegrationTest {
     void sitePublicAssetsDoNotRequireAuthentication() throws Exception {
         mvc.perform(get("/logo.png")).andExpect(status().isOk());
         mvc.perform(get("/favicon.png")).andExpect(status().isOk());
+        mvc.perform(get("/qr-android.svg")).andExpect(status().isOk());
+        mvc.perform(get("/qr-app.svg")).andExpect(status().isOk());
     }
 
     @Test
