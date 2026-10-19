@@ -91,6 +91,9 @@ class ClinicManagementIntegrationTest {
                 INSERT INTO contact_events (exam_id, price_at_contact, estimated_savings, created_at)
                 VALUES (?, 55.50, 0, now() - interval '31 days')""", createdExamId);
 
+        // Outros testes também geram visitas e cliques nas clínicas do seed: compara a variação.
+        var before = dashboard(token);
+
         String update = """
                 {"exam_type_id":"%s","price":60.00,"description":"Descrição atualizada",
                  "preparation":"Sem preparo","payment_methods":"Cartão","available":true}
@@ -109,10 +112,9 @@ class ClinicManagementIntegrationTest {
         mvc.perform(post("/api/v1/exams/{id}/contacts", createdExamId))
                 .andExpect(status().isCreated());
 
-        mvc.perform(get("/api/v1/clinic/me/dashboard").header("Authorization", "Bearer " + token))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.exam_views").value(1))
-                .andExpect(jsonPath("$.whatsapp_clicks").value(1));
+        var after = dashboard(token);
+        assertThat(after.get("exam_views").asLong() - before.get("exam_views").asLong()).isEqualTo(1);
+        assertThat(after.get("whatsapp_clicks").asLong() - before.get("whatsapp_clicks").asLong()).isEqualTo(1);
 
         mvc.perform(delete("/api/v1/clinic/me/exams/{id}", createdExamId)
                         .header("Authorization", "Bearer " + token))
@@ -145,6 +147,13 @@ class ClinicManagementIntegrationTest {
         TestUsers.TestUser patient = TestUsers.register(mvc, mapper);
         mvc.perform(get("/api/v1/clinic/me/dashboard").header("Authorization", patient.bearer()))
                 .andExpect(status().isForbidden());
+    }
+
+    private tools.jackson.databind.JsonNode dashboard(String token) throws Exception {
+        String json = mvc.perform(get("/api/v1/clinic/me/dashboard").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return mapper.readTree(json);
     }
 
     private String login(String phone) throws Exception {
