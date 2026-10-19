@@ -58,7 +58,7 @@
     .qr-card code { font-size:13px; color:var(--blue-deep); word-break:break-all; }
     /* Modo apresentação: os QR codes ocupam a tela para o público escanear. */
     #stage { position:fixed; inset:0; background:#fff; z-index:10; display:none; flex-direction:column;
-             align-items:center; justify-content:center; padding:24px; gap:2vh; }
+             align-items:center; justify-content:safe center; padding:24px; gap:2vh; overflow-y:auto; }
     #stage.open { display:flex; }
     #stage .stage-title { font-size:clamp(22px, 4vw, 40px); font-weight:800; margin:0; text-align:center; }
     #stage .stage-sub { color:var(--muted); font-size:clamp(15px, 2vw, 22px); margin:0; text-align:center; }
@@ -69,7 +69,7 @@
     #stage .qr-card p { font-size:clamp(14px, 1.8vw, 20px); }
     #stage .close { position:absolute; top:16px; right:16px; border:0; background:var(--line); color:var(--ink);
                     font:inherit; font-weight:700; border-radius:12px; padding:10px 16px; cursor:pointer; }
-    @media (max-width: 640px) { #stage .qr-grid { grid-template-columns: 1fr; } #stage .qr-card img { max-width:60vw; } }
+    @media (max-width: 640px) { #stage .qr-grid { grid-template-columns: 1fr; } #stage .qr-card img { max-width:min(60vw, 30vh); } }
     footer { border-top:1px solid var(--line); margin-top:28px; padding: 22px 0 36px; color:var(--muted); font-size:14px;
              display:flex; flex-wrap:wrap; gap:8px 24px; justify-content:space-between; }
     footer a { color: var(--blue); text-decoration: none; font-weight:600; }
