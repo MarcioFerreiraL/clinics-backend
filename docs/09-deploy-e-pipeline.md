@@ -6,7 +6,7 @@
 git push (develop) ──► GitHub Actions ──► testes ──► build da imagem ──► deploy por SSH ──► VPS (Docker)
 ```
 
-- **CI** (a cada push e pull request): roda `./mvnw verify` (154+ testes, com PostgreSQL real via Testcontainers) e confere se a imagem Docker compila.
+- **CI** (a cada push e pull request): roda `./mvnw verify` (mais de 250 testes, com PostgreSQL real via Testcontainers) e confere se a imagem Docker compila.
 - **CD** (só push na `develop`, e só se `DEPLOY_ENABLED=true`): conecta na VPS por SSH, envia o código e sobe os containers com `docker compose`.
 
 ## Arquivos
