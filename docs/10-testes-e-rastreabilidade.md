@@ -6,13 +6,12 @@ Os testes nascem dos documentos: cada requisito (RF/RNF), regra de negócio (RN)
 
 | Camada | Onde | O que verifica | Roda |
 |---|---|---|---|
-| Unidade (domínio) | `*/domain/*Test` | Regras puras: CPF, telefone, senha, distância, abertura da clínica, nota, link do WhatsApp | CI |
+| Regras com limites exatos | `catalog/CatalogRulesTest` | Horário de funcionamento (RN22), economia e melhor preço (RN15), distância (RN19) | CI |
 | Integração por endpoint | `*IntegrationTest` | Cada caso de uso pela API, com PostgreSQL real (Testcontainers) | CI |
-| **Modelo de dados (MER)** | `model/DataModelIntegrationTest` | Tabelas, tipos, `UNIQUE`, `CHECK`, FKs e `ON DELETE` do `05-modelo-de-dados.md` | CI |
+| **Modelo de dados (MER)** | `rules/DataModelIntegrationTest` | Tabelas, tipos, `UNIQUE`, `CHECK`, FKs e `ON DELETE` do `05-modelo-de-dados.md` | CI |
 | **Consistência do seed** | `rules/SeedDataConsistencyIntegrationTest` | Os dados de demonstração respeitam as regras (WhatsApp só com dígitos, nota = média das avaliações, histórico de preço, apelidos…) | CI |
 | **Regras de negócio** | `rules/BusinessRulesIntegrationTest` | RN05, 06, 07, 12, 15, 17, 19, 20, 21, 24, 30, 35, 36, 38 e RNF04, 06, 07 pela API | CI |
 | **Jornada do paciente** | `journey/PatientJourneyIntegrationTest` | RF01 a RF12 de ponta a ponta, mais a jornada do visitante e o texto do WhatsApp (RN28) | CI |
-| Arquitetura | `ArchitectureTest` | Domínio sem Spring/JPA; módulos só se falam pelas portas | CI |
 | Contrato | `OpenApiIntegrationTest` | Endpoints documentados no OpenAPI | CI |
 | **Smoke pós-deploy** | `deploy/smoke-test.sh` | A API publicada na VPS responde conforme o contrato | CD |
 
@@ -57,8 +56,8 @@ Os testes de integração que gravam dados rodam em transação desfeita no fim 
 
 | Regra | Teste |
 |---|---|
-| RN01 telefone único | `PhoneTest`, `DataModel`, `AuthIntegrationTest` |
-| RN03 senha forte | `PasswordPolicyTest`, `AuthIntegrationTest` |
+| RN01 telefone único | `DataModel`, `AuthIntegrationTest` |
+| RN03 senha forte | `AuthIntegrationTest` |
 | RN04 e-mail único | `DataModel`, `AuthIntegrationTest` |
 | RN05 papel PATIENT | `BusinessRules`, `DataModel` |
 | RN06 login sem enumeração | `BusinessRules` |
@@ -66,21 +65,21 @@ Os testes de integração que gravam dados rodam em transação desfeita no fim 
 | RN09–RN11 oferta, categoria, preço | `DataModel` |
 | RN12 só ofertas disponíveis | `BusinessRules` |
 | RN13 histórico de preço | `SeedDataConsistency`, `DataModel` |
-| RN14/RN15 média, economia, melhor preço | `ExamOfferTest`, `SearchExams`, `BusinessRules` |
+| RN14/RN15 média, economia, melhor preço | `CatalogRulesTest`, `SearchExams`, `BusinessRules` |
 | RN16/RN39 busca sem acento e por apelido | `SearchExamsIntegrationTest` |
-| RN17–RN19 ordenação e distância | `ExamSortAndCategoryTest`, `GeoPointTest`, `BusinessRules` |
+| RN17–RN19 ordenação e distância | `CatalogRulesTest`, `SearchExams`, `BusinessRules` |
 | RN20 localização não persiste | `DataModel`, `BusinessRules` |
 | RN21 paginação | `SearchExams`, `BusinessRules` |
-| RN22 aberta agora | `ClinicOpeningTest`, `DataModel` (horários) |
+| RN22 aberta agora | `CatalogRulesTest`, `DataModel` (horários) |
 | RN23 favorito idempotente | `FavoritesIntegrationTest`, `DataModel` |
 | RN24 só autenticados | `BusinessRules` |
-| RN25–RN27 avaliação | `ReviewTest`, `ReviewsIntegrationTest`, `DataModel`, `PatientJourney`, `SeedDataConsistency` |
-| RN28 link do WhatsApp | `WhatsAppLinkBuilderTest`, `PatientJourney` |
+| RN25–RN27 avaliação | `ReviewsIntegrationTest`, `DataModel`, `PatientJourney`, `SeedDataConsistency` |
+| RN28 link do WhatsApp | `PatientJourney`, `ContactAndTrending` |
 | RN29–RN31 contato, em alta, economia | `ContactAndTrending`, `SavingsIntegrationTest`, `DataModel` |
-| RN32–RN34 perfil e foto | `UserProfileTest`, `AvatarImageTest`, `ProfileIntegrationTest` |
+| RN32–RN34 perfil e foto | `ProfileIntegrationTest` |
 | RN35 isolamento por usuário | `BusinessRules` |
 | RN36 sem dados sensíveis | `BusinessRules` |
-| RN37 CPF | `CpfTest`, `AuthIntegrationTest`, `DataModel` |
+| RN37 CPF | `AuthIntegrationTest`, `DataModel` |
 | RN38 filtros e bairros | `SearchExamsIntegrationTest`, `BusinessRules` |
 
 ## Limitação conhecida

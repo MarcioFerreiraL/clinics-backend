@@ -20,25 +20,24 @@ Em cidades pequenas, descobrir quanto cada clínica cobra por um exame exige lig
 | Linguagem e framework | Java 25, Spring Boot 4.1 |
 | Banco de dados | PostgreSQL 17, migrações com Flyway |
 | Segurança | Spring Security, JWT (OAuth2 Resource Server), BCrypt |
-| Persistência | Spring Data JPA (escrita) e `JdbcClient` com SQL nativo (consultas) |
+| Acesso a dados | `JdbcClient` com SQL nativo |
 | Contrato da API | springdoc-openapi (Swagger UI) |
-| Testes | JUnit 5, AssertJ, MockMvc, Testcontainers, ArchUnit |
+| Testes | JUnit 5, AssertJ, MockMvc, Testcontainers |
 | Infra local | Docker Compose |
 
 ## Arquitetura
 
-Em camadas: **controller → service → repository**.
+Um pacote por funcionalidade, cada um com um **controller** (rotas, validação e formato do JSON) e um **service** (regras de negócio e SQL com `JdbcClient`).
 
 | Pacote | Responsabilidade |
 |---|---|
-| `controller` | Endpoints REST: recebem a requisição, validam a entrada e devolvem DTOs |
-| `service` | Regras de negócio: cadastro e login, busca e comparação, contatos, gestão da clínica, favoritos, avaliações e economia |
-| `repository` | Acesso ao PostgreSQL: SQL com `JdbcClient` nas consultas e Spring Data JPA para usuários |
-| `model` | Objetos de negócio (exame, clínica, usuário, avaliação…) e suas validações |
-| `dto` | Formatos de entrada e saída da API |
-| `config`, `security`, `exception`, `storage` | Configuração, JWT e senhas, tratamento de erros e fotos de perfil |
+| `user` | Cadastro, login, perfil, foto e senha |
+| `catalog` | Busca e comparação de preços, detalhes, contato pelo WhatsApp, em alta, clínicas e bairros |
+| `engagement` | Favoritos, economia e avaliações |
+| `clinicadmin` | Painel do gestor da clínica |
+| `common` | Erros (RFC 9457), JWT e regras de acesso, paginação, site/PWA, avatares e Swagger |
 
-A direção das dependências é verificada por um teste de arquitetura (ArchUnit): controller só chama service, service só chama repository, e nenhuma camada de baixo conhece a de cima. Detalhes, diagramas de classes e a estrutura de pacotes em [`docs/06-arquitetura-e-classes.md`](docs/06-arquitetura-e-classes.md).
+Detalhes em [`docs/06-arquitetura-e-classes.md`](docs/06-arquitetura-e-classes.md).
 
 ## Como executar
 
