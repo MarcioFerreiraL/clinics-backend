@@ -4,7 +4,6 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
-import br.com.clinics.catalog.CatalogService.Clinic;
 import br.com.clinics.catalog.CatalogService.Offer;
 import br.com.clinics.common.Page;
 import io.swagger.v3.oas.annotations.Operation;

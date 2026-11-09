@@ -6,7 +6,7 @@ import java.util.UUID;
 
 import br.com.clinics.clinicadmin.ClinicAdminService.Dashboard;
 import br.com.clinics.clinicadmin.ClinicAdminService.ExamData;
-import br.com.clinics.clinicadmin.ClinicAdminService.ExamType;
+import br.com.clinics.clinicadmin.ClinicAdminService.ExamTypeItem;
 import br.com.clinics.clinicadmin.ClinicAdminService.ManagedExam;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -52,7 +52,7 @@ public class ClinicAdminController {
 
     @GetMapping("/exam-catalog")
     @Operation(summary = "Tipos de exame que a clínica pode oferecer")
-    List<ExamType> catalog() {
+    List<ExamTypeItem> catalog() {
         return admin.catalog();
     }
 

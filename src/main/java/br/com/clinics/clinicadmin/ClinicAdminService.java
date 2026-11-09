@@ -1,15 +1,21 @@
 package br.com.clinics.clinicadmin;
 
 import java.math.BigDecimal;
-import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import br.com.clinics.catalog.Clinic;
+import br.com.clinics.catalog.ClinicRepository;
+import br.com.clinics.catalog.ContactEventRepository;
+import br.com.clinics.catalog.Exam;
+import br.com.clinics.catalog.ExamRepository;
+import br.com.clinics.catalog.ExamTypeRepository;
+import br.com.clinics.catalog.ExamViewEventRepository;
 import br.com.clinics.common.ApiException;
-import org.springframework.dao.DuplicateKeyException;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,10 +26,10 @@ public class ClinicAdminService {
     record Dashboard(String clinicName, long activeExams, long examViews, long whatsappClicks, int periodDays) {
     }
 
-    record ExamType(UUID id, String name, String category, String description) {
+    record ExamTypeItem(UUID id, String name, String category, String description) {
     }
 
-    record ManagedExam(UUID id, ExamType examType, BigDecimal price, String description, String preparation,
+    record ManagedExam(UUID id, ExamTypeItem examType, BigDecimal price, String description, String preparation,
             String paymentMethods, boolean available) {
     }
 
@@ -32,60 +38,50 @@ public class ClinicAdminService {
             boolean available) {
     }
 
-    private final JdbcClient jdbc;
+    private final ClinicRepository clinics;
+    private final ExamRepository exams;
+    private final ExamTypeRepository examTypes;
+    private final PriceHistoryRepository priceHistory;
+    private final ContactEventRepository contacts;
+    private final ExamViewEventRepository views;
     private final Clock clock;
 
-    public ClinicAdminService(JdbcClient jdbc, Clock clock) {
-        this.jdbc = jdbc;
+    public ClinicAdminService(ClinicRepository clinics, ExamRepository exams, ExamTypeRepository examTypes,
+            PriceHistoryRepository priceHistory, ContactEventRepository contacts, ExamViewEventRepository views,
+            Clock clock) {
+        this.clinics = clinics;
+        this.exams = exams;
+        this.examTypes = examTypes;
+        this.priceHistory = priceHistory;
+        this.contacts = contacts;
+        this.views = views;
         this.clock = clock;
     }
 
     /** Indicadores dos últimos 30 dias. */
     @Transactional(readOnly = true)
     public Dashboard dashboard(UUID userId) {
-        return jdbc.sql("""
-                        SELECT c.name,
-                               (SELECT COUNT(*) FROM exams e WHERE e.clinic_id = c.id AND e.available) AS active_exams,
-                               (SELECT COUNT(*) FROM exam_view_events v JOIN exams e ON e.id = v.exam_id
-                                WHERE e.clinic_id = c.id AND v.created_at >= :since) AS exam_views,
-                               (SELECT COUNT(*) FROM contact_events ce JOIN exams e ON e.id = ce.exam_id
-                                WHERE e.clinic_id = c.id AND ce.created_at >= :since) AS whatsapp_clicks
-                        FROM clinics c WHERE c.id = :clinicId""")
-                .param("clinicId", clinicId(userId))
-                .param("since", Timestamp.from(clock.instant().minus(Duration.ofDays(30))))
-                .query((rs, row) -> new Dashboard(rs.getString("name"), rs.getLong("active_exams"),
-                        rs.getLong("exam_views"), rs.getLong("whatsapp_clicks"), 30))
-                .single();
+        Clinic clinic = clinic(userId);
+        Instant since = clock.instant().minus(Duration.ofDays(30));
+        return new Dashboard(clinic.name(), exams.countByClinicIdAndAvailableTrue(clinic.id()),
+                views.countByClinicSince(clinic.id(), since), contacts.countByClinicSince(clinic.id(), since), 30);
     }
 
     @Transactional(readOnly = true)
-    public List<ExamType> catalog() {
-        return jdbc.sql("SELECT id, name, category, description FROM exam_types ORDER BY unaccent(lower(name))")
-                .query((rs, row) -> new ExamType(rs.getObject("id", UUID.class), rs.getString("name"),
-                        rs.getString("category"), rs.getString("description")))
-                .list();
+    public List<ExamTypeItem> catalog() {
+        return examTypes.findAllByName().stream()
+                .map(t -> new ExamTypeItem(t.id(), t.name(), t.category(), t.description()))
+                .toList();
     }
 
     /** Todas as ofertas da clínica, inclusive as desativadas. */
     @Transactional(readOnly = true)
     public List<ManagedExam> exams(UUID userId) {
-        return jdbc.sql("""
-                        SELECT e.id, t.id AS exam_type_id, t.name, t.category,
-                               COALESCE(e.description, t.description) AS description,
-                               e.price, e.preparation, e.payment_methods, e.available
-                        FROM exams e JOIN exam_types t ON t.id = e.exam_type_id
-                        WHERE e.clinic_id = ?
-                        ORDER BY unaccent(lower(t.name))""")
-                .param(clinicId(userId))
-                .query((rs, row) -> {
-                    String description = rs.getString("description");
-                    return new ManagedExam(rs.getObject("id", UUID.class),
-                            new ExamType(rs.getObject("exam_type_id", UUID.class), rs.getString("name"),
-                                    rs.getString("category"), description),
-                            rs.getBigDecimal("price"), description, rs.getString("preparation"),
-                            rs.getString("payment_methods"), rs.getBoolean("available"));
-                })
-                .list();
+        return exams.findManagedExams(clinic(userId).id()).stream()
+                .map(e -> new ManagedExam(e.getId(),
+                        new ExamTypeItem(e.getExamTypeId(), e.getName(), e.getCategory(), e.getDescription()),
+                        e.getPrice(), e.getDescription(), e.getPreparation(), e.getPaymentMethods(), e.getAvailable()))
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -96,47 +92,26 @@ public class ClinicAdminService {
 
     @Transactional
     public ManagedExam createExam(UUID userId, ExamData data) {
-        UUID clinicId = clinicId(userId);
+        UUID clinicId = clinic(userId).id();
         requireExamType(data.examTypeId());
-        Timestamp now = Timestamp.from(clock.instant());
-        try {
-            UUID id = jdbc.sql("""
-                            INSERT INTO exams (clinic_id, exam_type_id, price, description, preparation, payment_methods,
-                                               available, created_at, updated_at)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                            RETURNING id""")
-                    .params(clinicId, data.examTypeId(), data.price(), data.description(), data.preparation(),
-                            data.paymentMethods(), data.available(), now, now)
-                    .query(UUID.class)
-                    .single();
-            recordPrice(id, data.price(), now);
-            return exam(userId, id);
-        } catch (DuplicateKeyException e) {
-            throw duplicateOffer();
-        }
+        Instant now = clock.instant();
+        Exam exam = new Exam(clinicId, now);
+        save(exam, data, now);
+        priceHistory.save(new PriceHistory(exam.id(), data.price(), now));
+        return exam(userId, exam.id());
     }
 
     /** Atualiza a oferta; o histórico de preços só ganha uma linha quando o preço muda. */
     @Transactional
     public ManagedExam updateExam(UUID userId, UUID examId, ExamData data) {
-        UUID clinicId = clinicId(userId);
+        UUID clinicId = clinic(userId).id();
         requireExamType(data.examTypeId());
-        ManagedExam existing = exam(userId, examId);
-        Timestamp now = Timestamp.from(clock.instant());
-        try {
-            jdbc.sql("""
-                            UPDATE exams
-                            SET exam_type_id = ?, price = ?, description = ?, preparation = ?, payment_methods = ?,
-                                available = ?, updated_at = ?
-                            WHERE id = ? AND clinic_id = ?""")
-                    .params(data.examTypeId(), data.price(), data.description(), data.preparation(),
-                            data.paymentMethods(), data.available(), now, examId, clinicId)
-                    .update();
-        } catch (DuplicateKeyException e) {
-            throw duplicateOffer();
-        }
-        if (existing.price().compareTo(data.price()) != 0) {
-            recordPrice(examId, data.price(), now);
+        Exam exam = exams.findByIdAndClinicId(examId, clinicId).orElseThrow(ClinicAdminService::examNotFound);
+        boolean priceChanged = exam.price().compareTo(data.price()) != 0;
+        Instant now = clock.instant();
+        save(exam, data, now);
+        if (priceChanged) {
+            priceHistory.save(new PriceHistory(examId, data.price(), now));
         }
         return exam(userId, examId);
     }
@@ -149,20 +124,24 @@ public class ClinicAdminService {
                 e.paymentMethods(), false));
     }
 
-    private void recordPrice(UUID examId, BigDecimal price, Timestamp now) {
-        jdbc.sql("INSERT INTO price_history (exam_id, price, recorded_at) VALUES (?, ?, ?)")
-                .params(examId, price, now).update();
+    /** Grava já, para a oferta repetida na mesma clínica (UNIQUE no banco) virar 409 aqui. */
+    private void save(Exam exam, ExamData data, Instant now) {
+        exam.update(data.examTypeId(), data.price(), data.description(), data.preparation(), data.paymentMethods(),
+                data.available(), now);
+        try {
+            exams.saveAndFlush(exam);
+        } catch (DataIntegrityViolationException e) {
+            throw duplicateOffer();
+        }
     }
 
-    private UUID clinicId(UUID userId) {
-        return jdbc.sql("SELECT id FROM clinics WHERE owner_user_id = ?").param(userId).query(UUID.class).optional()
+    private Clinic clinic(UUID userId) {
+        return clinics.findByOwnerUserId(userId)
                 .orElseThrow(() -> ApiException.notFound("CLINIC_NOT_FOUND", "Nenhuma clínica está vinculada a esta conta."));
     }
 
     private void requireExamType(UUID examTypeId) {
-        boolean exists = jdbc.sql("SELECT EXISTS (SELECT 1 FROM exam_types WHERE id = ?)").param(examTypeId)
-                .query(Boolean.class).single();
-        if (!exists) {
+        if (!examTypes.existsById(examTypeId)) {
             throw ApiException.notFound("EXAM_TYPE_NOT_FOUND", "O exame selecionado não existe no catálogo.");
         }
     }

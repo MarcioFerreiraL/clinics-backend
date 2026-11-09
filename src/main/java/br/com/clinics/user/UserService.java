@@ -4,9 +4,6 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -20,7 +17,6 @@ import br.com.clinics.common.WebConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
@@ -38,15 +34,10 @@ public class UserService {
     private static final Pattern EMAIL = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
     private static final int MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 
-    /** Linha da tabela {@code users}. Telefone e CPF ficam só com dígitos. */
-    record User(UUID id, String phone, String cpf, String email, String passwordHash, String fullName, String role,
-            LocalDate birthDate, String avatarUrl, Instant createdAt) {
-    }
-
     record Token(String value, Instant expiresAt) {
     }
 
-    private final JdbcClient jdbc;
+    private final UserRepository users;
     private final BCryptPasswordEncoder passwords;
     private final JwtEncoder jwtEncoder;
     private final Duration tokenExpiration;
@@ -55,9 +46,9 @@ public class UserService {
     /** Comparado quando o telefone não existe, para o tempo de resposta não revelar quem tem conta. */
     private final String dummyHash;
 
-    public UserService(JdbcClient jdbc, BCryptPasswordEncoder passwords, JwtEncoder jwtEncoder,
+    public UserService(UserRepository users, BCryptPasswordEncoder passwords, JwtEncoder jwtEncoder,
             Duration tokenExpiration, Path avatarsDir, Clock clock) {
-        this.jdbc = jdbc;
+        this.users = users;
         this.passwords = passwords;
         this.jwtEncoder = jwtEncoder;
         this.tokenExpiration = tokenExpiration;
@@ -74,10 +65,10 @@ public class UserService {
         String phone = parsePhone(rawPhone);
         String cpf = parseCpf(rawCpf);
         validatePassword(password);
-        if (exists("phone = ?", phone)) {
+        if (users.existsByPhone(phone)) {
             throw ApiException.conflict("PHONE_ALREADY_REGISTERED", "Este telefone já possui uma conta.");
         }
-        if (exists("cpf = ?", cpf)) {
+        if (users.existsByCpf(cpf)) {
             throw ApiException.conflict("CPF_ALREADY_REGISTERED", "Este CPF já possui uma conta.");
         }
         String name = requireName(fullName);
@@ -89,19 +80,10 @@ public class UserService {
         if (birthDate == null) {
             throw ApiException.badRequest("INVALID_BIRTH_DATE", "Informe sua data de nascimento.");
         }
-        if (exists("lower(email) = ?", email)) {
+        if (users.existsByEmailIgnoreCase(email)) {
             throw ApiException.conflict("EMAIL_ALREADY_IN_USE", "Este e-mail já está em uso.");
         }
-        UUID id = UUID.randomUUID();
-        Instant now = clock.instant();
-        jdbc.sql("""
-                        INSERT INTO users (id, phone, cpf, email, password_hash, full_name, role, birth_date,
-                                           created_at, updated_at)
-                        VALUES (?, ?, ?, ?, ?, ?, 'PATIENT', ?, ?, ?)""")
-                .params(id, phone, cpf, email, passwords.encode(password), name, birthDate,
-                        Timestamp.from(now), Timestamp.from(now))
-                .update();
-        return find(id);
+        return users.save(new User(phone, cpf, email, passwords.encode(password), name, birthDate, clock.instant()));
     }
 
     @Transactional(readOnly = true)
@@ -134,24 +116,22 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public User find(UUID id) {
-        return jdbc.sql("SELECT * FROM users WHERE id = ?").param(id).query(UserService::map).optional()
+        return users.findById(id)
                 .orElseThrow(() -> ApiException.notFound("USER_NOT_FOUND", "Usuário não encontrado."));
     }
 
     /** Nome, e-mail e nascimento são editáveis; telefone e CPF não. */
     @Transactional
     public User updateProfile(UUID id, String fullName, String rawEmail, LocalDate birthDate) {
-        find(id);
+        User user = find(id);
         String name = requireName(fullName);
         String email = normalizeEmail(rawEmail);
         validateBirthDate(birthDate);
-        if (email != null && exists("lower(email) = ? AND id <> ?", email, id)) {
+        if (email != null && users.existsByEmailIgnoreCaseAndIdNot(email, id)) {
             throw ApiException.conflict("EMAIL_ALREADY_IN_USE", "Este e-mail já está em uso por outra conta.");
         }
-        jdbc.sql("UPDATE users SET full_name = ?, email = ?, birth_date = ?, updated_at = ? WHERE id = ?")
-                .params(name, email, birthDate, Timestamp.from(clock.instant()), id)
-                .update();
-        return find(id);
+        user.updateProfile(name, email, birthDate, clock.instant());
+        return users.save(user);
     }
 
     /** Somente JPEG ou PNG de até 2 MB; o tipo é detectado pelos bytes, não pelo cabeçalho do cliente. */
@@ -166,11 +146,11 @@ public class UserService {
         } catch (IOException e) {
             throw new UncheckedIOException("Falha ao gravar o avatar", e);
         }
-        jdbc.sql("UPDATE users SET avatar_url = ?, updated_at = ? WHERE id = ?")
-                .params(WebConfig.AVATARS_PREFIX + filename, Timestamp.from(clock.instant()), id)
-                .update();
-        deleteAvatar(user.avatarUrl());
-        return find(id);
+        String previous = user.avatarUrl();
+        user.changeAvatar(WebConfig.AVATARS_PREFIX + filename, clock.instant());
+        User saved = users.save(user);
+        deleteAvatar(previous);
+        return saved;
     }
 
     @Transactional
@@ -183,9 +163,8 @@ public class UserService {
         if (passwords.matches(next, user.passwordHash())) {
             throw ApiException.badRequest("SAME_PASSWORD", "A nova senha deve ser diferente da atual.");
         }
-        jdbc.sql("UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?")
-                .params(passwords.encode(next), Timestamp.from(clock.instant()), id)
-                .update();
+        user.changePassword(passwords.encode(next), clock.instant());
+        users.save(user);
     }
 
     // ---- regras de formato ----
@@ -286,8 +265,6 @@ public class UserService {
         return true;
     }
 
-    // ---- banco ----
-
     private Optional<User> findByPhone(String rawPhone) {
         String phone;
         try {
@@ -295,12 +272,7 @@ public class UserService {
         } catch (ApiException invalidPhone) {
             return Optional.empty();
         }
-        return jdbc.sql("SELECT * FROM users WHERE phone = ?").param(phone).query(UserService::map).optional();
-    }
-
-    private boolean exists(String where, Object... params) {
-        return jdbc.sql("SELECT EXISTS (SELECT 1 FROM users WHERE " + where + ")").params(params)
-                .query(Boolean.class).single();
+        return users.findByPhone(phone);
     }
 
     private void deleteAvatar(String publicPath) {
@@ -316,12 +288,5 @@ public class UserService {
         } catch (IOException e) {
             log.warn("Não foi possível remover o avatar antigo {}", target, e);
         }
-    }
-
-    private static User map(ResultSet rs, int row) throws SQLException {
-        return new User(rs.getObject("id", UUID.class), rs.getString("phone"), rs.getString("cpf"),
-                rs.getString("email"), rs.getString("password_hash"), rs.getString("full_name"), rs.getString("role"),
-                rs.getObject("birth_date", LocalDate.class), rs.getString("avatar_url"),
-                rs.getTimestamp("created_at").toInstant());
     }
 }

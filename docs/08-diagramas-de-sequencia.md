@@ -1,6 +1,6 @@
 # 08 · Diagramas de Sequência
 
-Os fluxos abaixo mostram como uma requisição passa pelo controller e pelo service do pacote correspondente até o PostgreSQL. Os participantes são as classes em `src/main/java/br/com/clinics`.
+Os fluxos abaixo mostram como uma requisição passa pelo controller e pelo service do pacote correspondente até o PostgreSQL. O service chega ao banco sempre pelos repositórios Spring Data JPA, representados em um único participante. Os participantes são as classes em `src/main/java/br/com/clinics`.
 
 ## 1. Cadastro e login (UC01, UC02)
 
@@ -10,7 +10,7 @@ sequenceDiagram
     actor P as Paciente (app)
     participant C as UserController
     participant S as UserService
-    participant DB as PostgreSQL
+    participant DB as Repositórios / PostgreSQL
 
     P->>C: POST /auth/register {full_name, phone, cpf, email, birth_date, password}
     C->>C: Bean Validation (campos obrigatórios)
@@ -36,7 +36,7 @@ sequenceDiagram
     actor P as Paciente (app)
     participant C as UserController
     participant S as UserService
-    participant DB as PostgreSQL
+    participant DB as Repositórios / PostgreSQL
 
     P->>C: POST /auth/login {phone, password}
     C->>S: login(phone, password)
@@ -81,7 +81,7 @@ sequenceDiagram
     actor P as Paciente (app)
     participant C as CatalogController
     participant S as CatalogService
-    participant DB as PostgreSQL
+    participant DB as Repositórios / PostgreSQL
 
     P->>C: GET /exams/search?query&category&sort_by&lat&lng&neighborhood&min_price&max_price&min_rating&best_price_only
     C->>S: search(...)
@@ -105,7 +105,7 @@ sequenceDiagram
     participant S as CatalogService
     participant EC as EngagementController
     participant ES as EngagementService
-    participant DB as PostgreSQL
+    participant DB as Repositórios / PostgreSQL
 
     P->>C: POST /exams/{id}/contacts (token opcional)
     C->>S: contact(examId, userId ou null)
@@ -128,7 +128,7 @@ sequenceDiagram
     actor P as Paciente (app)
     participant C as EngagementController
     participant S as EngagementService
-    participant DB as PostgreSQL
+    participant DB as Repositórios / PostgreSQL
 
     P->>C: PUT /clinics/{id}/reviews/me {rating, comment}
     C->>S: submitReview(userId, clinicId, rating, comment)
@@ -136,8 +136,8 @@ sequenceDiagram
     S->>DB: a clínica existe? (CLINIC_NOT_FOUND)
     S->>S: nota 1..5 e comentário ≤ 1000
     S->>DB: já existe avaliação deste paciente?
-    S->>DB: INSERT ... ON CONFLICT (user, clínica) DO UPDATE
-    S->>DB: UPDATE clinics: rating = média com 1 casa, review_count
+    S->>DB: grava a avaliação (nova ou editada; UNIQUE por usuário e clínica)
+    S->>DB: atualiza clinics: rating = média com 1 casa, review_count
     C-->>P: 201 se criou, 200 se substituiu
 ```
 
@@ -150,7 +150,7 @@ sequenceDiagram
     participant C as UserController
     participant S as UserService
     participant FS as Disco (AVATARS_DIR)
-    participant DB as PostgreSQL
+    participant DB as Repositórios / PostgreSQL
 
     P->>C: PUT /me/avatar (multipart, parte "file")
     C->>S: changeAvatar(userId, bytes)

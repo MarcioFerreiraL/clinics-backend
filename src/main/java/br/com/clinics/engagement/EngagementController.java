@@ -5,7 +5,7 @@ import java.util.UUID;
 import br.com.clinics.common.Page;
 import br.com.clinics.engagement.EngagementService.FavoriteItem;
 import br.com.clinics.engagement.EngagementService.PublicReview;
-import br.com.clinics.engagement.EngagementService.Review;
+import br.com.clinics.engagement.EngagementService.MyReview;
 import br.com.clinics.engagement.EngagementService.SavingsResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -72,7 +72,7 @@ public class EngagementController {
     @PutMapping("/api/v1/clinics/{clinicId}/reviews/me")
     @SecurityRequirement(name = "bearer-jwt")
     @Operation(summary = "Cria ou substitui a minha avaliação (201 na primeira vez, 200 ao reavaliar)")
-    ResponseEntity<Review> submitReview(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID clinicId,
+    ResponseEntity<MyReview> submitReview(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID clinicId,
             @Valid @RequestBody ReviewRequest request) {
         var result = engagement.submitReview(userId(jwt), clinicId, request.rating(), request.comment());
         return ResponseEntity.status(result.created() ? HttpStatus.CREATED : HttpStatus.OK).body(result.review());
@@ -81,7 +81,7 @@ public class EngagementController {
     @GetMapping("/api/v1/clinics/{clinicId}/reviews/me")
     @SecurityRequirement(name = "bearer-jwt")
     @Operation(summary = "Consulta a minha avaliação da clínica")
-    Review myReview(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID clinicId) {
+    MyReview myReview(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID clinicId) {
         return engagement.myReview(userId(jwt), clinicId);
     }
 

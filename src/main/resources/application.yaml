@@ -10,6 +10,11 @@ spring:
       minimum-idle: 2
   jmx:
     enabled: false
+  jpa:
+    open-in-view: false
+    hibernate:
+      # O esquema vem só das migrations do Flyway; o Hibernate apenas confere se as entidades batem.
+      ddl-auto: validate
   flyway:
     enabled: true
   web:

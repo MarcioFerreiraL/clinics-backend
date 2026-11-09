@@ -20,14 +20,14 @@ Em cidades pequenas, descobrir quanto cada clínica cobra por um exame exige lig
 | Linguagem e framework | Java 25, Spring Boot 4.1 |
 | Banco de dados | PostgreSQL 17, migrações com Flyway |
 | Segurança | Spring Security, JWT (OAuth2 Resource Server), BCrypt |
-| Acesso a dados | `JdbcClient` com SQL nativo |
+| Acesso a dados | Spring Data JPA (Hibernate) |
 | Contrato da API | springdoc-openapi (Swagger UI) |
 | Testes | JUnit 5, AssertJ, MockMvc, Testcontainers |
 | Infra local | Docker Compose |
 
 ## Arquitetura
 
-Um pacote por funcionalidade, cada um com um **controller** (rotas, validação e formato do JSON) e um **service** (regras de negócio e SQL com `JdbcClient`).
+Um pacote por funcionalidade, cada um com um **controller** (rotas, validação e formato do JSON), um **service** (regras de negócio) e as entidades e **repositórios** Spring Data JPA (acesso ao banco).
 
 | Pacote | Responsabilidade |
 |---|---|
