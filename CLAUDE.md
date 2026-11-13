@@ -26,6 +26,7 @@ Endpoints úteis: `/swagger-ui.html`, `/v3/api-docs`, `/actuator/health`.
 ## Deploy
 
 - CI/CD no GitHub Actions (`.github/workflows/ci-cd.yml`; teste de carga em `performance.yml`, k6 em `loadtest/`).
+- Produção sai só da `main`: o deploy roda no push na `main` (merge do PR `develop` → `main`). A `develop` só roda testes.
 - Produção: VPS Oracle, acessível por `ssh vps-oracle`, em `/opt/clinics-backend`, com `compose.prod.yaml`, atrás de Cloudflare Tunnel. Detalhes em `docs/09-deploy-e-pipeline.md`.
 - O banco de produção roda no container `clinics-backend-postgres-1`. Nunca rodar `DROP`, `TRUNCATE` ou migration destrutiva sem confirmação.
 

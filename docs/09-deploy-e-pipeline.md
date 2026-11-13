@@ -3,11 +3,12 @@
 ## Visão geral
 
 ```
-git push (develop) ──► GitHub Actions ──► testes ──► build da imagem ──► deploy por SSH ──► VPS (Docker)
+merge na main ──► GitHub Actions ──► testes ──► build da imagem ──► deploy por SSH ──► VPS (Docker)
 ```
 
 - **CI** (a cada push e pull request): roda `./mvnw verify` (mais de 170 testes pela API, com PostgreSQL real via Testcontainers) e confere se a imagem Docker compila.
-- **CD** (só push na `develop`, e só se `DEPLOY_ENABLED=true`): conecta na VPS por SSH, envia o código e sobe os containers com `docker compose`.
+- **Branches:** o trabalho entra na `develop` por PR (só testes, sem deploy). Produção sai só da `main`, que recebe a `develop` por PR.
+- **CD** (só push na `main`, e só se `DEPLOY_ENABLED=true`): conecta na VPS por SSH, envia o código e sobe os containers com `docker compose`.
 
 ## Arquivos
 
