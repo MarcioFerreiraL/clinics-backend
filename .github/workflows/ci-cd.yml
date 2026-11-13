@@ -1,0 +1,87 @@
+name: CI/CD do back-end
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Testes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      # Os testes de integração usam Testcontainers (Docker já vem no runner).
+      - name: Rodar testes
+        run: ./mvnw -B verify
+      - name: Resumo dos testes
+        if: always()
+        run: |
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import glob, re
+          t = f = e = s = 0
+          for p in glob.glob('target/surefire-reports/TEST-*.xml'):
+              m = re.search(r'tests="(\d+)" errors="(\d+)" skipped="(\d+)" failures="(\d+)"', open(p, encoding='utf-8').read())
+              if m:
+                  a, b, c, d = map(int, m.groups()); t += a; e += b; s += c; f += d
+          print('### Testes do back-end')
+          print(f'| Total | Falhas | Erros | Ignorados |\n|---|---|---|---|\n| {t} | {f} | {e} | {s} |')
+          PY
+      - name: Publicar relatórios dos testes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: relatorios-de-teste
+          path: target/surefire-reports/
+          retention-days: 14
+
+  docker:
+    name: Imagem Docker
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construir a imagem (sem publicar)
+        run: docker build -t clinics-api:${{ github.sha }} .
+
+  deploy:
+    name: Deploy na VPS
+    needs: [test, docker]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      # O site serve o app web (PWA) em /app/: compila a partir do repositório do app e embute na imagem.
+      - uses: actions/checkout@v4
+        with:
+          repository: MarcioFerreiraL/clinics-mobile
+          ref: develop
+          path: clinics-mobile
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.4'
+          channel: stable
+          cache: true
+      - name: Gerar o app web (PWA)
+        run: deploy/build-web.sh clinics-mobile/clinics https://clinics.marciodev.com
+      - name: Preparar a chave SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+      - name: Publicar
+        run: deploy/deploy.sh "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" ~/.ssh/deploy_key

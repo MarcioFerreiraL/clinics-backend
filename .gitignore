@@ -34,3 +34,9 @@ build/
 
 # Arquivos enviados em execução local
 /data/
+
+.env
+loadtest/results/
+
+# App web (PWA) é gerado no build/deploy a partir do repositório do app
+src/main/resources/static/app/

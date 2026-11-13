@@ -96,7 +96,7 @@ Os 12 casos de uso da Entrega 2 estão implementados no back-end. Os exemplos de
 
 | UC | Nome | Ator | Pré-condição | Fluxo principal | Fluxos alternativos | Regras | Endpoint |
 |---|---|---|---|---|---|---|---|
-| UC01 | Cadastrar conta | Visitante | Telefone não cadastrado | Informa nome, telefone e senha → valida → cria `PATIENT` → devolve token | Telefone duplicado (409); dados inválidos (400) | RN01–RN05 | `POST /api/v1/auth/register` |
+| UC01 | Cadastrar conta | Visitante | Telefone não cadastrado | Informa nome, telefone, CPF, e-mail, nascimento e senha → valida → cria `PATIENT` → devolve token | Telefone, CPF ou e-mail duplicado (409); dados inválidos (400) | RN01–RN05, RN37 | `POST /api/v1/auth/register` |
 | UC02 | Autenticar | Visitante | Conta existente | Informa telefone e senha → valida → devolve JWT | Credenciais inválidas (401) | RN06, RN07 | `POST /api/v1/auth/login` |
 | UC03 | Buscar e comparar exames | Visitante | – | Informa termo, categoria e ordenação → recebe página de ofertas com média, economia e distância | Sem resultados (lista vazia); `distance` sem `lat/lng` (400) | RN12, RN14–RN21 | `GET /api/v1/exams/search` |
 | UC04 | Ver detalhes do exame | Visitante | Oferta existe e está disponível | Seleciona oferta → recebe dados da oferta e da clínica | Oferta inexistente (404) | RN22 | `GET /api/v1/exams/{id}` |

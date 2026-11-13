@@ -1,6 +1,6 @@
 # 08 · Diagramas de Sequência
 
-Os fluxos abaixo mostram como uma requisição atravessa as camadas hexagonais (`web` → `application` → `domain` → `infrastructure`). Cada diagrama corresponde ao código real.
+Os fluxos abaixo mostram como uma requisição passa pelo controller e pelo service do pacote correspondente até o PostgreSQL. O service chega ao banco sempre pelos repositórios Spring Data JPA, representados em um único participante. Os participantes são as classes em `src/main/java/br/com/clinics`.
 
 ## 1. Cadastro e login (UC01, UC02)
 
@@ -8,27 +8,24 @@ Os fluxos abaixo mostram como uma requisição atravessa as camadas hexagonais (
 sequenceDiagram
     autonumber
     actor P as Paciente (app)
-    participant C as AuthController
-    participant S as RegisterUserService
-    participant D as Phone / PasswordPolicy (domínio)
-    participant R as UserRepository (JPA)
-    participant H as BcryptPasswordHasher
-    participant T as JwtTokenIssuer
+    participant C as UserController
+    participant S as UserService
+    participant DB as Repositórios / PostgreSQL
 
-    P->>C: POST /auth/register {full_name, phone, password}
+    P->>C: POST /auth/register {full_name, phone, cpf, email, birth_date, password}
     C->>C: Bean Validation (campos obrigatórios)
-    C->>S: register(command)
-    S->>D: Phone.of(raw) e PasswordPolicy.validate()
-    D-->>S: telefone normalizado (5581...) ou ValidationException
-    S->>R: existsByPhone(phone)
-    alt telefone já cadastrado
-        S-->>C: ConflictException PHONE_ALREADY_REGISTERED
+    C->>S: register(...)
+    S->>S: parsePhone, parseCpf, validatePassword
+    Note over S: telefone vira 5581..., CPF só dígitos;<br/>formato inválido gera 400 (INVALID_PHONE, INVALID_CPF, WEAK_PASSWORD)
+    S->>DB: telefone ou CPF já existem?
+    alt já cadastrado
+        S-->>C: 409 PHONE_ALREADY_REGISTERED / CPF_ALREADY_REGISTERED
         C-->>P: 409 problem+json
-    else telefone livre
-        S->>H: hash(password) — BCrypt custo 10
-        S->>R: save(User.register(...) com papel PATIENT)
-        S->>T: issue(user) — sub, role, exp
-        S-->>C: AuthResult
+    else livres
+        S->>S: valida nome, e-mail e nascimento
+        S->>DB: e-mail em uso? (409 EMAIL_ALREADY_IN_USE)
+        S->>DB: INSERT users (senha com BCrypt custo 10, papel PATIENT)
+        C->>S: issueToken(user) — sub, role, exp
         C-->>P: 201 {token, user}
     end
 ```
@@ -37,22 +34,19 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     actor P as Paciente (app)
-    participant C as AuthController
-    participant S as AuthenticateService
-    participant R as UserRepository
-    participant H as PasswordHasher
-    participant T as TokenIssuer
+    participant C as UserController
+    participant S as UserService
+    participant DB as Repositórios / PostgreSQL
 
     P->>C: POST /auth/login {phone, password}
-    C->>S: authenticate(command)
-    S->>R: findByPhone(phone)
-    Note over S,H: Se o telefone não existe, compara com um hash descartável<br/>para igualar o tempo de resposta (RN06)
-    S->>H: matches(password, hash)
+    C->>S: login(phone, password)
+    S->>DB: SELECT usuário pelo telefone
+    Note over S: Se o telefone não existe, compara com um hash descartável<br/>para igualar o tempo de resposta (RN06)
     alt credenciais inválidas
-        S-->>C: AuthenticationFailedException
-        C-->>P: 401 INVALID_CREDENTIALS (mesma resposta para os dois casos)
+        S-->>C: 401 INVALID_CREDENTIALS (mesma resposta para os dois casos)
+        C-->>P: 401 problem+json
     else válidas
-        S->>T: issue(user)
+        C->>S: issueToken(user)
         C-->>P: 200 {token, user}
     end
 ```
@@ -64,19 +58,17 @@ sequenceDiagram
     autonumber
     actor P as Paciente (app)
     participant F as Filtro OAuth2 Resource Server
-    participant C as MeController
-    participant S as ManageProfileService
-    participant R as UserRepository
+    participant C as UserController
+    participant S as UserService
 
     P->>F: GET /me — Authorization: Bearer <token>
-    F->>F: valida assinatura HS256 e expiração
+    F->>F: valida assinatura HS256 e expiração (SecurityConfig)
     alt token ausente, inválido ou expirado
         F-->>P: 401 UNAUTHENTICATED (problem+json)
     else token válido
         F->>C: Jwt (sub = id do usuário, role)
-        C->>S: getProfile(UUID.fromString(sub))
+        C->>S: find(userId(jwt))
         Note over C,S: O id vem sempre do token,<br/>nunca da URL ou do corpo (RN35)
-        S->>R: findById(id)
         C-->>P: 200 perfil
     end
 ```
@@ -87,24 +79,19 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     actor P as Paciente (app)
-    participant C as ExamController
-    participant S as SearchExamsService
-    participant R as ExamOfferRepository (SQL)
-    participant D as ExamOffer / ExamSort / GeoPoint (domínio)
+    participant C as CatalogController
+    participant S as CatalogService
+    participant DB as Repositórios / PostgreSQL
 
-    P->>C: GET /exams/search?query&category&sort_by&lat&lng
-    C->>S: search(query)
-    S->>D: ExamCategory.parse(), ExamSort.parse(), new GeoPoint(lat,lng)
-    D-->>S: valida — sort=distance sem lat e lng gera LOCATION_REQUIRED (400)
-    S->>R: findAvailable(texto, categoria)
-    Note over R: Uma consulta: funções de janela calculam<br/>AVG e MIN por tipo de exame, unaccent na busca
-    R-->>S: ofertas com average_price e min_price
-    loop para cada oferta
-        S->>D: distanceKmFrom(origem) — Haversine
-    end
-    S->>D: ordena com ExamSort.comparator()
-    S->>S: pagina em memória (size ≤ 50)
-    S-->>C: PageResult
+    P->>C: GET /exams/search?query&category&sort_by&lat&lng&neighborhood&min_price&max_price&min_rating&best_price_only
+    C->>S: search(...)
+    S->>S: valida categoria, ordenação, lat/lng e faixas
+    Note over S: sort_by=distance sem lat e lng gera LOCATION_REQUIRED (400)
+    S->>DB: SQL OFFERS + filtro de texto e apelidos (unaccent)
+    Note over DB: funções de janela calculam AVG e MIN por tipo de exame
+    DB-->>S: ofertas com average_price e min_price
+    S->>S: filtra por bairro, preço, nota e melhor preço
+    S->>S: calcula distância (Haversine), ordena e pagina (size ≤ 50)
     C-->>P: 200 {total, data[{price, average_price, savings, best_price, distance_km}]}
 ```
 
@@ -114,27 +101,23 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     actor P as Paciente (app)
-    participant C as ContactController
-    participant S as RegisterContactService
-    participant L as CatalogContactableExamLookup
-    participant K as GetExamDetailsUseCase (catálogo)
-    participant W as WhatsAppLinkBuilder (domínio)
-    participant E as ContactEventRepository
+    participant C as CatalogController
+    participant S as CatalogService
+    participant EC as EngagementController
+    participant ES as EngagementService
+    participant DB as Repositórios / PostgreSQL
 
     P->>C: POST /exams/{id}/contacts (token opcional)
-    C->>C: userId = sub do JWT, ou null para visitante
-    C->>S: register(examId, userId)
-    S->>L: findById(examId)
-    L->>K: getById(examId) — porta pública do catálogo
-    K-->>L: oferta (preço, economia, WhatsApp)
-    L-->>S: ContactableExam (vocabulário do módulo engagement)
-    S->>W: build(whatsapp, nome, preço)
-    W-->>S: https://wa.me/55...?text=<mensagem codificada>
-    S->>E: save(ContactEvent com preço e economia congelados)
+    C->>S: contact(examId, userId ou null)
+    S->>DB: busca a oferta (EXAM_NOT_FOUND se não existe)
+    S->>S: monta https://wa.me/55...?text=<mensagem codificada>
+    S->>DB: INSERT contact_events com preço e economia congelados
     C-->>P: 201 {contact_id, whatsapp_url, estimated_savings}
     Note over P: O app abre o link com url_launcher
-    P->>C: GET /me/savings
-    C-->>P: {total_savings: soma dos estimated_savings do usuário}
+    P->>EC: GET /me/savings
+    EC->>ES: savings(userId do JWT)
+    ES->>DB: SUM(estimated_savings), COUNT(*)
+    EC-->>P: 200 {total_savings, contacts_count}
 ```
 
 ## 5. Avaliar clínica (UC10)
@@ -143,26 +126,18 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     actor P as Paciente (app)
-    participant C as ReviewController
-    participant S as ReviewClinicService
-    participant D as Review / RatingStats (domínio)
-    participant R as ReviewRepository (SQL)
+    participant C as EngagementController
+    participant S as EngagementService
+    participant DB as Repositórios / PostgreSQL
 
     P->>C: PUT /clinics/{id}/reviews/me {rating, comment}
-    C->>S: submit(userId, clinicId, rating, comment)
-    Note over S,R: Tudo em uma única transação
-    S->>R: clinicExists(id)
-    S->>R: findByUserAndClinic(userId, clinicId)
-    alt já avaliou
-        S->>D: review.edit(rating, comment) — substitui
-    else primeira avaliação
-        S->>D: Review.create(...) — valida nota 1..5 e comentário ≤ 1000
-    end
-    S->>R: save(review) — INSERT ... ON CONFLICT (user, clínica) DO UPDATE
-    S->>R: statsFor(clinicId) → soma e contagem
-    S->>D: RatingStats.average() — 1 casa decimal, HALF_UP
-    S->>R: updateClinicRating(clinicId, stats)
-    S-->>C: SubmitResult(review, created)
+    C->>S: submitReview(userId, clinicId, rating, comment)
+    Note over S,DB: Tudo em uma única transação
+    S->>DB: a clínica existe? (CLINIC_NOT_FOUND)
+    S->>S: nota 1..5 e comentário ≤ 1000
+    S->>DB: já existe avaliação deste paciente?
+    S->>DB: grava a avaliação (nova ou editada; UNIQUE por usuário e clínica)
+    S->>DB: atualiza clinics: rating = média com 1 casa, review_count
     C-->>P: 201 se criou, 200 se substituiu
 ```
 
@@ -172,19 +147,17 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     actor P as Paciente (app)
-    participant C as MeController
-    participant S as ManageProfileService
-    participant D as AvatarImage (domínio)
-    participant A as LocalAvatarStorage
-    participant R as UserRepository
+    participant C as UserController
+    participant S as UserService
+    participant FS as Disco (AVATARS_DIR)
+    participant DB as Repositórios / PostgreSQL
 
     P->>C: PUT /me/avatar (multipart, parte "file")
     C->>S: changeAvatar(userId, bytes)
-    S->>D: AvatarImage.of(bytes)
-    Note over D: Detecta PNG/JPEG pelos bytes iniciais<br/>e rejeita arquivos > 2 MB (RN34)
-    D-->>S: imagem válida ou INVALID_AVATAR (400)
-    S->>A: save(userId, image) → /files/avatars/<id>-<rand>.png
-    S->>R: save(user com novo avatar_url)
-    S->>A: delete(foto anterior)
+    S->>S: detecta PNG/JPEG pelos bytes e rejeita > 2 MB (RN34)
+    Note over S: inválido gera INVALID_AVATAR (400)
+    S->>FS: grava <id>-<rand>.png
+    S->>DB: UPDATE users SET avatar_url = /files/avatars/...
+    S->>FS: apaga a foto anterior
     C-->>P: 200 perfil com avatar_url
 ```

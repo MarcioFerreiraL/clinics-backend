@@ -20,28 +20,37 @@ Em cidades pequenas, descobrir quanto cada clínica cobra por um exame exige lig
 | Linguagem e framework | Java 25, Spring Boot 4.1 |
 | Banco de dados | PostgreSQL 17, migrações com Flyway |
 | Segurança | Spring Security, JWT (OAuth2 Resource Server), BCrypt |
-| Persistência | Spring Data JPA (escrita) e `JdbcClient` com SQL nativo (consultas) |
+| Acesso a dados | Spring Data JPA (Hibernate) |
 | Contrato da API | springdoc-openapi (Swagger UI) |
-| Testes | JUnit 5, AssertJ, MockMvc, Testcontainers, ArchUnit |
+| Testes | JUnit 5, AssertJ, MockMvc, Testcontainers |
 | Infra local | Docker Compose |
 
 ## Arquitetura
 
-Hexagonal (portas e adaptadores), organizada por funcionalidade em três módulos:
+Um pacote por funcionalidade, cada um com um **controller** (rotas, validação e formato do JSON), um **service** (regras de negócio) e as entidades e **repositórios** Spring Data JPA (acesso ao banco).
 
-- **`identity`**: cadastro, login, perfil, foto e senha.
-- **`catalog`**: busca e comparação, detalhes, perfil da clínica e exames em alta.
-- **`engagement`**: contato por WhatsApp, economia, favoritos e avaliações.
+| Pacote | Responsabilidade |
+|---|---|
+| `user` | Cadastro, login, perfil, foto e senha |
+| `catalog` | Busca e comparação de preços, detalhes, contato pelo WhatsApp, em alta, clínicas e bairros |
+| `engagement` | Favoritos, economia e avaliações |
+| `clinicadmin` | Painel do gestor da clínica |
+| `common` | Erros (RFC 9457), JWT e regras de acesso, paginação, site/PWA, avatares e Swagger |
 
-O domínio não depende de Spring nem de JPA, e essa regra é verificada por um teste de arquitetura (ArchUnit). Detalhes, diagramas de classes e a estrutura de pacotes em [`docs/06-arquitetura-e-classes.md`](docs/06-arquitetura-e-classes.md).
+Detalhes em [`docs/06-arquitetura-e-classes.md`](docs/06-arquitetura-e-classes.md).
 
 ## Como executar
 
 **Pré-requisitos:** JDK 25 e Docker.
 
 ```bash
-docker compose up -d            # PostgreSQL na porta 5433
+cp .env.example .env            # variáveis locais (o .env não vai para o Git)
+docker compose up -d postgres   # só o PostgreSQL na porta 5433
+set -a && . ./.env && set +a    # carrega o .env no terminal
 ./mvnw spring-boot:run          # API em http://localhost:8080
+
+# ou banco + API juntos, em containers:
+# docker compose up -d --build
 ```
 
 As migrações rodam sozinhas na primeira subida e já carregam dados de demonstração de Surubim (6 clínicas, 18 tipos de exame, 31 ofertas e avaliações).
@@ -86,10 +95,13 @@ Base: `/api/v1`. Acesso: 🌐 público, 🔓 token opcional, 🔒 exige token. E
 | UC10 | Avaliar clínica | `GET /clinics/{id}/reviews`, `PUT` e `GET /clinics/{id}/reviews/me` | 🌐 / 🔒 |
 | UC11 | Gerenciar perfil | `GET` e `PUT /me`, `PUT /me/avatar` | 🔒 |
 | UC12 | Alterar senha | `PUT /me/password` | 🔒 |
+| — | Painel da clínica | `GET /clinic/me/dashboard` | 🔒 gerente |
+| — | Gerenciar exames | `GET/POST /clinic/me/exams`, `PUT/DELETE /clinic/me/exams/{id}` | 🔒 gerente |
+| — | Catálogo de exames | `GET /clinic/me/exam-catalog` | 🔒 gerente |
 
 ## Banco de dados
 
-Nove tabelas de domínio, versionadas em `src/main/resources/db/migration`: `users`, `clinics`, `clinic_operating_hours`, `exam_types`, `exams`, `favorites`, `reviews`, `price_history` e `contact_events`. O diagrama entidade-relacionamento, o dicionário de dados e as decisões de modelagem estão em [`docs/05-modelo-de-dados.md`](docs/05-modelo-de-dados.md).
+Onze tabelas de domínio, versionadas em `src/main/resources/db/migration`: `users`, `clinics`, `clinic_operating_hours`, `exam_types`, `exam_type_aliases`, `exams`, `favorites`, `reviews`, `price_history`, `contact_events` e `exam_view_events`. O diagrama entidade-relacionamento, o dicionário de dados e as decisões de modelagem estão em [`docs/05-modelo-de-dados.md`](docs/05-modelo-de-dados.md).
 
 ```mermaid
 erDiagram
@@ -103,6 +115,8 @@ erDiagram
     clinics ||--o{ clinic_operating_hours : "funciona em"
     exams ||--o{ price_history : tem
     exams ||--o{ contact_events : motiva
+    exams ||--o{ exam_view_events : recebe
+    exam_types ||--o{ exam_type_aliases : apelidos
 ```
 
 ## Documentação
@@ -114,7 +128,7 @@ erDiagram
 | [`03-regras-de-negocio.md`](docs/03-regras-de-negocio.md) | Regras de negócio numeradas (RN01 a RN36) |
 | [`04-casos-de-uso.md`](docs/04-casos-de-uso.md) | Diagrama e especificação dos casos de uso |
 | [`05-modelo-de-dados.md`](docs/05-modelo-de-dados.md) | MER, dicionário de dados e migrações |
-| [`06-arquitetura-e-classes.md`](docs/06-arquitetura-e-classes.md) | Arquitetura hexagonal e diagramas de classes |
+| [`06-arquitetura-e-classes.md`](docs/06-arquitetura-e-classes.md) | Arquitetura em camadas e diagramas de classes |
 | [`07-referencia-da-api.md`](docs/07-referencia-da-api.md) | Endpoints com exemplos reais e catálogo de erros |
 | [`08-diagramas-de-sequencia.md`](docs/08-diagramas-de-sequencia.md) | Fluxos principais de ponta a ponta |
 
@@ -127,6 +141,8 @@ erDiagram
 
 ## Status
 
-**Entrega 2:** os 12 casos de uso do paciente estão implementados e testados, com 9 tabelas PostgreSQL.
+**Entrega 2:** os casos de uso do paciente estão implementados e testados.
 
-**Entrega 3 (planejada):** recuperar senha, histórico de buscas, consentimento LGPD, exportar e excluir dados, refresh token, controle de acesso por papéis (RBAC) e gestão de exames pela clínica.
+**Gestão da clínica:** painel com contagens dos últimos 30 dias e cadastro/edição/desativação de ofertas estão implementados para contas `CLINIC_MANAGER`. A conta deve ser vinculada manualmente a uma clínica por `clinics.owner_user_id`; o cadastro público continua criando apenas pacientes.
+
+**Evoluções planejadas:** recuperar senha, histórico de buscas, consentimento LGPD, exportar e excluir dados e refresh token.

@@ -26,6 +26,7 @@ A versão interativa fica em `/swagger-ui.html` e o contrato em `/v3/api-docs`.
 | UC01 | `POST /auth/register` | 🌐 | 201 | Cadastra paciente e já devolve o token |
 | UC02 | `POST /auth/login` | 🌐 | 200 | Autentica com telefone e senha |
 | UC03 | `GET /exams/search` | 🌐 | 200 | Busca e compara ofertas |
+| UC13 | `GET /neighborhoods` | 🌐 | 200 | Bairros com clínicas |
 | UC04 | `GET /exams/{id}` | 🌐 | 200 | Detalhes da oferta e da clínica |
 | UC05 | `GET /clinics/{id}` | 🌐 | 200 | Perfil público, horários e exames |
 | UC06 | `GET /exam-types/trending` | 🌐 | 200 | Exames em alta na semana |
@@ -41,6 +42,12 @@ A versão interativa fica em `/swagger-ui.html` e o contrato em `/v3/api-docs`.
 | UC11 | `PUT /me` | 🔒 | 200 | Edita nome, e-mail e nascimento |
 | UC11 | `PUT /me/avatar` | 🔒 | 200 | Foto de perfil (multipart) |
 | UC12 | `PUT /me/password` | 🔒 | 204 | Troca a senha |
+| — | `GET /clinic/me/dashboard` | 🔒 gerente | 200 | Indicadores dos últimos 30 dias |
+| — | `GET /clinic/me/exam-catalog` | 🔒 gerente | 200 | Tipos disponíveis para cadastro |
+| — | `GET /clinic/me/exams` | 🔒 gerente | 200 | Lista ofertas ativas e inativas |
+| — | `POST /clinic/me/exams` | 🔒 gerente | 201 | Cadastra oferta da clínica |
+| — | `PUT /clinic/me/exams/{id}` | 🔒 gerente | 200 | Edita oferta da clínica |
+| — | `DELETE /clinic/me/exams/{id}` | 🔒 gerente | 204 | Desativa oferta |
 
 Arquivos de avatar são servidos em `GET /files/avatars/{arquivo}` (público). O campo `avatar_url` guarda o caminho relativo.
 
@@ -49,7 +56,8 @@ Arquivos de avatar são servidos em `GET /files/avatars/{arquivo}` (público). O
 ### UC01 · `POST /auth/register`
 ```json
 // requisição
-{ "full_name": "Maria Silva", "phone": "(81) 99876-5432", "password": "Senha1234" }
+{ "full_name": "Maria Silva", "phone": "(81) 99876-5432", "cpf": "529.982.247-25",
+  "email": "maria@email.com", "birth_date": "1990-05-20", "password": "Senha1234" }
 ```
 ```json
 // 201
@@ -61,7 +69,7 @@ Arquivos de avatar são servidos em `GET /files/avatars/{arquivo}` (público). O
             "phone": "(81) 99876-5432", "role": "PATIENT" }
 }
 ```
-O telefone aceita qualquer formatação; é normalizado para dígitos com DDI 55 (RN01). Senha: mínimo de 8 caracteres com letras e números (RN03). Erros: `INVALID_PHONE`, `WEAK_PASSWORD`, `PHONE_ALREADY_REGISTERED` (409), `VALIDATION_ERROR`.
+Telefone e CPF aceitam qualquer formatação: o telefone é normalizado para dígitos com DDI 55 (RN01) e o CPF para 11 dígitos, com validação dos dígitos verificadores (RN37). E-mail e data de nascimento são obrigatórios. Senha: mínimo de 8 caracteres com letras e números (RN03). Erros: `INVALID_PHONE`, `INVALID_CPF`, `INVALID_EMAIL`, `INVALID_BIRTH_DATE`, `WEAK_PASSWORD`, `PHONE_ALREADY_REGISTERED`, `CPF_ALREADY_REGISTERED`, `EMAIL_ALREADY_IN_USE` (409), `VALIDATION_ERROR`.
 
 ### UC02 · `POST /auth/login`
 Corpo `{ "phone": "...", "password": "..." }`. A resposta é igual à do cadastro. Falha devolve sempre `INVALID_CREDENTIALS` (401), sem revelar se o telefone existe (RN06).
@@ -72,10 +80,14 @@ O token tem as claims `sub` (id do usuário), `role`, `iat` e `exp`.
 
 | Parâmetro | Tipo | Observação |
 |---|---|---|
-| `query` | texto | Ignora caixa e acentos; `%` e `_` são texto literal |
+| `query` | texto | Nome clínico ou popular ("colesterol", "esteira", "chapa do braço"); ignora caixa e acentos; `%` e `_` são texto literal |
 | `category` | texto | `Sangue`, `Raio-X`, `Consultas`, `Cardio` ou `Ultrassom` |
 | `sort_by` | texto | `price` (padrão), `rating`, `name` ou `distance` |
 | `lat`, `lng` | decimal | Obrigatórios com `sort_by=distance`; sempre juntos. Não são armazenados (RN20) |
+| `neighborhood` | texto | Bairro da clínica; ignora caixa e acentos |
+| `min_price`, `max_price` | decimal | Faixa de preço em reais |
+| `min_rating` | decimal | Nota mínima da clínica (0 a 5) |
+| `best_price_only` | booleano | Só as ofertas de menor preço de cada exame |
 | `page`, `size` | inteiro | Paginação |
 
 ```json
@@ -86,7 +98,7 @@ O token tem as claims `sub` (id do usuário), `role`, `iat` e `exp`.
     {
       "id": "cf5956f8-27c6-48d5-b66e-14f06d50fc85",
       "exam_type": { "id": "e2efd2c4-...", "name": "Ultrassom Abdominal Total", "category": "Ultrassom" },
-      "clinic": { "id": "8dc21c45-...", "name": "Clínica Santa Maria", "neighborhood": "Centro",
+      "clinic": { "id": "8dc21c45-...", "name": "Clínica Santa Mariazinha", "neighborhood": "Centro",
                   "rating": 4.8, "is_verified": true, "whatsapp_number": "5581999999999", "logo_url": "https://..." },
       "price": 90.0,
       "average_price": 118.0,
@@ -104,7 +116,13 @@ O token tem as claims `sub` (id do usuário), `role`, `iat` e `exp`.
 - `best_price` marca a oferta de menor preço.
 - `distance_km` só aparece quando `lat` e `lng` são informados e a clínica tem coordenadas.
 
-Erros: `INVALID_CATEGORY`, `INVALID_SORT`, `LOCATION_REQUIRED`, `LOCATION_INCOMPLETE`, `INVALID_COORDINATES`.
+Erros: `INVALID_CATEGORY`, `INVALID_SORT`, `INVALID_PRICE_RANGE`, `INVALID_MIN_RATING`, `LOCATION_REQUIRED`, `LOCATION_INCOMPLETE`, `INVALID_COORDINATES`.
+
+### UC13 · `GET /neighborhoods`
+```json
+[ { "name": "Centro", "clinics_count": 2 }, { "name": "Cohab", "clinics_count": 1 } ]
+```
+Alimenta o seletor de bairro do app. Ordem alfabética, sem acento.
 
 ### UC04 · `GET /exams/{id}` (aceita `lat` e `lng` opcionais)
 ```json
@@ -116,7 +134,7 @@ Erros: `INVALID_CATEGORY`, `INVALID_SORT`, `LOCATION_REQUIRED`, `LOCATION_INCOMP
   "preparation": "Jejum 8h • Laudo em 24h",
   "payment_methods": "Pix à vista ou até 3x no cartão",
   "clinic": {
-    "id": "8dc21c45-...", "name": "Clínica Santa Maria", "address": "Rua João Alfredo, 142",
+    "id": "8dc21c45-...", "name": "Clínica Santa Mariazinha", "address": "Rua João Alfredo, 142",
     "neighborhood": "Centro", "phone_number": "(81) 3634-1122", "whatsapp_number": "5581999999999",
     "rating": 4.8, "review_count": 5, "is_verified": true,
     "latitude": -7.8333, "longitude": -35.7528,
@@ -192,10 +210,10 @@ A nota (1 a 5) é obrigatória; o comentário tem até 1000 caracteres. Ao salva
 ### UC11 · Perfil
 ```json
 // GET /me
-{ "id": "12cbcc59-...", "full_name": "Maria Silva", "phone": "(81) 99876-5432",
+{ "id": "12cbcc59-...", "full_name": "Maria Silva", "phone": "(81) 99876-5432", "cpf": "529.982.247-25",
   "role": "PATIENT", "created_at": "2026-10-13T01:57:34Z" }
 ```
-`email`, `birth_date` e `avatar_url` aparecem quando preenchidos.
+`email`, `birth_date` e `avatar_url` aparecem quando preenchidos. O CPF não é editável.
 
 `PUT /me` aceita `full_name` (obrigatório), `email` e `birth_date` (`YYYY-MM-DD`). O telefone enviado é ignorado (RN32). E-mail vazio remove o e-mail.
 
@@ -206,6 +224,45 @@ A nota (1 a 5) é obrigatória; o comentário tem até 1000 caracteres. Ao salva
 { "current_password": "Senha1234", "new_password": "NovaSenha99" }
 ```
 Resposta 204. Erros: `INVALID_CURRENT_PASSWORD`, `WEAK_PASSWORD`, `SAME_PASSWORD`.
+
+### Gestão da clínica
+
+As rotas abaixo exigem o papel `CLINIC_MANAGER`. A clínica é resolvida pelo `sub` do JWT e `clinics.owner_user_id`; nenhum ID de clínica enviado pelo cliente é aceito. Cada gerente pode estar associado a uma única clínica. O cadastro público continua criando apenas pacientes, portanto a associação e a concessão do papel são feitas pelo processo administrativo do ambiente.
+
+`GET /clinic/me/dashboard` devolve:
+
+```json
+{
+  "clinic_name": "Clínica Santa Maria",
+  "active_exams": 18,
+  "exam_views": 74,
+  "whatsapp_clicks": 21,
+  "period_days": 30
+}
+```
+
+O período é uma janela móvel de 30 dias. `exam_views` conta requisições bem-sucedidas a `GET /exams/{id}` e `whatsapp_clicks` conta eventos persistidos por `POST /exams/{id}/contacts`. São contagens de eventos, não de pessoas únicas (há tráfego anônimo).
+
+`GET /clinic/me/exam-catalog` lista os tipos globais selecionáveis. `GET /clinic/me/exams` devolve `{ "exams": [...] }`, incluindo ofertas inativas. Exemplo de item:
+
+```json
+{
+  "id": "cf5956f8-27c6-48d5-b66e-14f06d50fc85",
+  "exam_type": {
+    "id": "e2efd2c4-...",
+    "name": "Ultrassom Abdominal Total",
+    "category": "ULTRASSOM",
+    "description": "Descrição do procedimento"
+  },
+  "price": 95.00,
+  "description": "Descrição específica da oferta da clínica",
+  "preparation": "Jejum 8h",
+  "payment_methods": "Pix ou cartão",
+  "available": true
+}
+```
+
+`POST /clinic/me/exams` e `PUT /clinic/me/exams/{id}` aceitam `exam_type_id`, `price`, `description`, `preparation`, `payment_methods` e `available`. Cada clínica pode ofertar cada tipo do catálogo uma vez (`EXAM_ALREADY_OFFERED`, 409). A descrição da oferta substitui a descrição genérica no detalhe público; se vier nula, a descrição do catálogo é usada. `DELETE` desativa a oferta sem apagar seu histórico. Uma oferta inexistente ou de outra clínica resulta em `EXAM_NOT_FOUND` (404).
 
 ## 4. Formato de erro e catálogo de códigos
 
@@ -224,11 +281,11 @@ Resposta 204. Erros: `INVALID_CURRENT_PASSWORD`, `WEAK_PASSWORD`, `SAME_PASSWORD
 
 | Status | Códigos |
 |---|---|
-| 400 | `VALIDATION_ERROR`, `MALFORMED_REQUEST`, `INVALID_PHONE`, `WEAK_PASSWORD`, `INVALID_NAME`, `INVALID_EMAIL`, `INVALID_BIRTH_DATE`, `INVALID_AVATAR`, `INVALID_CURRENT_PASSWORD`, `SAME_PASSWORD`, `INVALID_CATEGORY`, `INVALID_SORT`, `LOCATION_REQUIRED`, `LOCATION_INCOMPLETE`, `INVALID_COORDINATES`, `INVALID_RATING`, `COMMENT_TOO_LONG`, `CLINIC_WITHOUT_WHATSAPP` |
+| 400 | `VALIDATION_ERROR`, `MALFORMED_REQUEST`, `INVALID_PHONE`, `INVALID_CPF`, `WEAK_PASSWORD`, `INVALID_NAME`, `INVALID_EMAIL`, `INVALID_BIRTH_DATE`, `INVALID_AVATAR`, `INVALID_CURRENT_PASSWORD`, `SAME_PASSWORD`, `INVALID_CATEGORY`, `INVALID_SORT`, `INVALID_PRICE_RANGE`, `INVALID_MIN_RATING`, `LOCATION_REQUIRED`, `LOCATION_INCOMPLETE`, `INVALID_COORDINATES`, `INVALID_RATING`, `COMMENT_TOO_LONG`, `CLINIC_WITHOUT_WHATSAPP` |
 | 401 | `INVALID_CREDENTIALS` (login), `UNAUTHENTICATED` (token ausente, inválido ou expirado) |
 | 403 | `ACCESS_DENIED` |
 | 404 | `EXAM_NOT_FOUND`, `EXAM_TYPE_NOT_FOUND`, `CLINIC_NOT_FOUND`, `REVIEW_NOT_FOUND`, `USER_NOT_FOUND` |
-| 409 | `PHONE_ALREADY_REGISTERED`, `EMAIL_ALREADY_IN_USE` |
+| 409 | `PHONE_ALREADY_REGISTERED`, `CPF_ALREADY_REGISTERED`, `EMAIL_ALREADY_IN_USE`, `EXAM_ALREADY_OFFERED` |
 | 500 | `INTERNAL_ERROR` (sem detalhes técnicos na resposta) |
 
 ## 5. Como testar manualmente
@@ -238,7 +295,7 @@ docker compose up -d && ./mvnw spring-boot:run
 
 # cadastro e guarda o token
 TOKEN=$(curl -s -X POST localhost:8080/api/v1/auth/register -H 'Content-Type: application/json' \
-  -d '{"full_name":"Maria Silva","phone":"(81) 99876-5432","password":"Senha1234"}' | jq -r .token)
+  -d '{"full_name":"Maria Silva","phone":"(81) 99876-5432","cpf":"529.982.247-25","email":"maria@email.com","birth_date":"1990-05-20","password":"Senha1234"}' | jq -r .token)
 
 # busca pública e rota protegida
 curl "localhost:8080/api/v1/exams/search?query=hemograma"

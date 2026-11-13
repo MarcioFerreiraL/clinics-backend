@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# Publica o back-end na VPS: constrói a imagem aqui, envia pronta e sobe os containers.
+# Uso: deploy/deploy.sh <usuario>@<ip> [caminho-da-chave]
+set -euo pipefail
+
+TARGET="${1:?uso: deploy.sh usuario@ip [chave]}"
+KEY="${2:-}"
+SSH_OPTS=(-o StrictHostKeyChecking=accept-new)
+[[ -n "$KEY" ]] && SSH_OPTS+=(-i "$KEY" -o IdentitiesOnly=yes)
+REMOTE_DIR="/opt/clinics-backend"
+IMAGE="clinics-api:latest"
+
+ssh_run() { ssh "${SSH_OPTS[@]}" "$TARGET" "$@"; }
+
+[ -d src/main/resources/static/app ] || echo "AVISO: o app web (PWA) não está embutido. Rode deploy/build-web.sh antes para publicar /app/."
+echo "==> Construindo a imagem"
+docker build -t "$IMAGE" .
+
+echo "==> Preparando a VPS"
+ssh_run "command -v docker >/dev/null || { echo 'Docker não instalado na VPS' >&2; exit 1; }"
+ssh_run "sudo mkdir -p $REMOTE_DIR && sudo chown \$USER $REMOTE_DIR"
+
+echo "==> Enviando a imagem e o compose"
+docker save "$IMAGE" | gzip | ssh_run 'gunzip | sudo docker load'
+scp "${SSH_OPTS[@]}" compose.prod.yaml "$TARGET:$REMOTE_DIR/compose.prod.yaml"
+
+echo "==> Atualizando o APK do site (se houver uma versão publicada)"
+ssh_run "mkdir -p $REMOTE_DIR/downloads"
+APK_TMP="$(mktemp)"
+APK_URL="${APK_URL:-https://github.com/MarcioFerreiraL/clinics-mobile/releases/download/app-latest/clinics.apk}"
+if [[ -n "${APK_FILE:-}" ]] && [[ -f "$APK_FILE" ]]; then
+  cp "$APK_FILE" "$APK_TMP"
+elif ! curl -fsSL -o "$APK_TMP" "$APK_URL"; then
+  rm -f "$APK_TMP"
+  echo "AVISO: nenhum APK publicado em $APK_URL; mantendo o que já está na VPS (se houver)."
+fi
+if [[ -s "$APK_TMP" ]]; then
+  scp "${SSH_OPTS[@]}" "$APK_TMP" "$TARGET:$REMOTE_DIR/downloads/clinics.apk.new"
+  ssh_run "chmod 644 $REMOTE_DIR/downloads/clinics.apk.new && mv $REMOTE_DIR/downloads/clinics.apk.new $REMOTE_DIR/downloads/clinics.apk"
+  rm -f "$APK_TMP"
+fi
+
+echo "==> Configurando segredos (só na primeira vez)"
+ssh_run "cd $REMOTE_DIR && [ -f .env ] || { printf 'DB_PASSWORD=%s\nJWT_SECRET=%s\n' \"\$(openssl rand -hex 16)\" \"\$(openssl rand -hex 32)\" > .env; chmod 600 .env; }"
+
+echo "==> Subindo os containers"
+ssh_run "cd $REMOTE_DIR && sudo docker compose -f compose.prod.yaml up -d"
+
+echo "==> Aguardando a API"
+for _ in $(seq 1 40); do
+  if ssh_run 'curl -fs http://localhost:8080/actuator/health' | grep -q UP; then
+    echo "API no ar na VPS (porta 8080)"
+    echo "==> Smoke test"
+    ssh_run 'bash -s' < deploy/smoke-test.sh
+    exit 0
+  fi
+  sleep 5
+done
+echo "A API não respondeu a tempo. Veja: sudo docker compose -f $REMOTE_DIR/compose.prod.yaml logs api" >&2
+exit 1
