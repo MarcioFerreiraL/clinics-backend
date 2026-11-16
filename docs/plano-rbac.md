@@ -1,6 +1,6 @@
 # Plano: RBAC do Clinics no modelo do SIEP
 
-Status: **aguardando aprovação**. Nenhum código foi alterado.
+Status: **aprovado e implementado** na branch `feat/rbac`. Mudança em relação ao plano: o perfil ficou em `GET /me/access` (`/auth/**` é público no `SecurityConfig`), e entrou `GET /clinic/{clinicId}/dashboard` para exercitar o escopo.
 
 ## Objetivo
 
