@@ -31,9 +31,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import static br.com.clinics.common.SecurityConfig.userId;
 
-/** Acesso restrito ao papel CLINIC_MANAGER (ver SecurityConfig). */
+/** Papel CLINIC_MANAGER ou ADMIN na camada 1 (SecurityConfig); a permissão de cada ação é checada no service. */
 @RestController
-@RequestMapping("/api/v1/clinic/me")
+@RequestMapping("/api/v1/clinic")
 @Tag(name = "Gestão da clínica")
 @SecurityRequirement(name = "bearer-jwt")
 public class ClinicAdminController {
@@ -44,39 +44,45 @@ public class ClinicAdminController {
         this.admin = admin;
     }
 
-    @GetMapping("/dashboard")
+    @GetMapping("/me/dashboard")
     @Operation(summary = "Indicadores da clínica nos últimos 30 dias")
     Dashboard dashboard(@AuthenticationPrincipal Jwt jwt) {
         return admin.dashboard(userId(jwt));
     }
 
-    @GetMapping("/exam-catalog")
-    @Operation(summary = "Tipos de exame que a clínica pode oferecer")
-    List<ExamTypeItem> catalog() {
-        return admin.catalog();
+    @GetMapping("/{clinicId}/dashboard")
+    @Operation(summary = "Indicadores de uma clínica; 404 se estiver fora do escopo do cargo")
+    Dashboard dashboardOf(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID clinicId) {
+        return admin.dashboard(userId(jwt), clinicId);
     }
 
-    @GetMapping("/exams")
+    @GetMapping("/me/exam-catalog")
+    @Operation(summary = "Tipos de exame que a clínica pode oferecer")
+    List<ExamTypeItem> catalog(@AuthenticationPrincipal Jwt jwt) {
+        return admin.catalog(userId(jwt));
+    }
+
+    @GetMapping("/me/exams")
     @Operation(summary = "Ofertas da clínica, inclusive as inativas")
     ExamListResponse exams(@AuthenticationPrincipal Jwt jwt) {
         return new ExamListResponse(admin.exams(userId(jwt)));
     }
 
-    @PostMapping("/exams")
+    @PostMapping("/me/exams")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Cadastra uma oferta de exame")
     ManagedExam create(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody ExamOfferRequest request) {
         return admin.createExam(userId(jwt), request.toData());
     }
 
-    @PutMapping("/exams/{id}")
+    @PutMapping("/me/exams/{id}")
     @Operation(summary = "Atualiza uma oferta de exame")
     ManagedExam update(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
             @Valid @RequestBody ExamOfferRequest request) {
         return admin.updateExam(userId(jwt), id, request.toData());
     }
 
-    @DeleteMapping("/exams/{id}")
+    @DeleteMapping("/me/exams/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Desativa uma oferta sem apagar o histórico")
     void deactivate(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
