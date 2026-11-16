@@ -36,9 +36,6 @@ class ClinicManagementIntegrationTest {
         if (createdExamId != null) {
             jdbc.update("DELETE FROM exams WHERE id = ?", createdExamId);
         }
-        if (clinicId != null) {
-            jdbc.update("UPDATE clinics SET owner_user_id = NULL WHERE id = ?", clinicId);
-        }
         if (managerId != null) {
             jdbc.update("DELETE FROM users WHERE id = ?", managerId);
         }
@@ -48,9 +45,10 @@ class ClinicManagementIntegrationTest {
     void clinicManagerCanManageOffersAndSeeRecentEngagement() throws Exception {
         TestUsers.TestUser user = TestUsers.register(mvc, mapper);
         managerId = user.id();
-        clinicId = jdbc.queryForObject("SELECT id FROM clinics WHERE owner_user_id IS NULL LIMIT 1", UUID.class);
+        clinicId = jdbc.queryForObject("SELECT id FROM clinics WHERE id NOT IN (SELECT clinic_id FROM internal_users WHERE clinic_id IS NOT NULL) LIMIT 1", UUID.class);
         jdbc.update("UPDATE users SET role = 'CLINIC_MANAGER' WHERE id = ?", managerId);
-        jdbc.update("UPDATE clinics SET owner_user_id = ? WHERE id = ?", managerId, clinicId);
+        jdbc.update("INSERT INTO internal_users (user_id, position_id, clinic_id) VALUES (?, (SELECT id FROM positions WHERE name = 'Gestor da clínica'), ?)",
+                managerId, clinicId);
         String token = login(user.phone());
 
         mvc.perform(get("/api/v1/clinic/me/dashboard").header("Authorization", "Bearer " + token))

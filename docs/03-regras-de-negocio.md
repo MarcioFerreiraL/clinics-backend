@@ -66,9 +66,17 @@ Cada regra tem um identificador estável (`RN`) para ser citado em código, test
 | RN38 | A busca aceita filtros combináveis: bairro, faixa de preço, nota mínima da clínica e somente melhor preço. Média e menor preço continuam calculados sobre todas as ofertas do tipo (RN14). A lista de bairros vem das clínicas cadastradas. | Aplicação |
 | RN39 | A busca entende nomes populares: cada tipo de exame tem apelidos (`exam_type_aliases`), como "colesterol" para Lipidograma ou "esteira" para Teste Ergométrico. O texto casa com o nome clínico ou com um apelido, ignorando caixa e acentos, e também quando o apelido aparece dentro de uma frase maior. | Consulta |
 
+## Controle de acesso (RBAC)
+
+- **Camada 1, papel:** `/clinic/**` exige `CLINIC_MANAGER` ou `ADMIN`; `/admin/**` exige `ADMIN`. Sem token, 401; papel errado, 403.
+- **Camada 2, permissão:** o cargo da conta (`internal_users` → `positions`) concede permissões `recurso.ação` (`position_permissions`). Sem a permissão, 403 `ACCESS_DENIED`. As permissões vêm do banco a cada requisição: mudar a matriz vale na hora, sem esperar o token expirar.
+- **Escopo:** Administrador (`all`) vê qualquer clínica; Gestor e Atendente (`own_clinic`) só a da lotação. Clínica fora do escopo responde 404 `CLINIC_NOT_FOUND`, sem revelar que existe.
+- **Matriz inicial:** Administrador tem as 9 permissões; Gestor tem `clinica.*`, `exame.*` e `indicadores.ver`; Atendente tem só as de leitura (`clinica.ver`, `exame.ver`, `indicadores.ver`).
+- Toda concessão, retirada de permissão e troca de cargo grava em `permission_audit_logs`.
+- Ninguém troca o próprio cargo, e o Administrador não perde `permissao.gerenciar`.
+
 ## Regras reservadas para a Entrega 3
 
 - Recuperação de senha com código de 6 dígitos válido por 15 minutos e uso único.
 - Histórico de buscas guarda no máximo as últimas 20 por paciente.
 - A exclusão de conta anonimiza avaliações e contatos em vez de apagá-los.
-- Rotas de gestão de exames exigem papel `CLINIC_MANAGER` e dono da clínica (`owner_user_id = usuário do token`), com resposta 403 em caso contrário.

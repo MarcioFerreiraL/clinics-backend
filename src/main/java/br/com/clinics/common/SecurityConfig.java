@@ -32,7 +32,7 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * JWT assinado com HS256: o token leva {@code sub} (id do usuário), {@code role} e {@code exp}.
- * Busca, detalhes e contato são públicos; o resto exige token, e {@code /clinic/me} exige o papel de gestor.
+ * Busca, detalhes e contato são públicos; o resto exige token, {@code /clinic/**} exige gestor ou admin e {@code /admin/**} exige admin (camada 1); a permissão fica no AccessService.
  */
 @Configuration
 public class SecurityConfig {
@@ -98,7 +98,8 @@ public class SecurityConfig {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/auth/**").permitAll()
-                        .requestMatchers("/api/v1/clinic/me/**").hasRole("CLINIC_MANAGER")
+                        .requestMatchers("/api/v1/clinic/**").hasAnyRole("CLINIC_MANAGER", "ADMIN")
+                        .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/clinics/*/reviews/me").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/exams/**", "/api/v1/exam-types/**",
                                 "/api/v1/clinics/**", "/api/v1/neighborhoods").permitAll()

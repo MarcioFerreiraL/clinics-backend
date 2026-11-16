@@ -48,6 +48,12 @@ A versão interativa fica em `/swagger-ui.html` e o contrato em `/v3/api-docs`.
 | — | `POST /clinic/me/exams` | 🔒 gerente | 201 | Cadastra oferta da clínica |
 | — | `PUT /clinic/me/exams/{id}` | 🔒 gerente | 200 | Edita oferta da clínica |
 | — | `DELETE /clinic/me/exams/{id}` | 🔒 gerente | 204 | Desativa oferta |
+| — | `GET /clinic/{clinicId}/dashboard` | 🔒 gerente/admin | 200 | Indicadores de uma clínica; 404 fora do escopo |
+| — | `GET /me/access` | 🔒 | 200 | Cargo, clínica e permissões da conta |
+| — | `GET /admin/accounts` | 🔒 admin | 200 | Contas internas (`conta.listar`) |
+| — | `PUT /admin/accounts/{id}/position` | 🔒 admin | 204 | Troca o cargo (`conta.gerenciar`) |
+| — | `GET /admin/positions` | 🔒 admin | 200 | Matriz de cargos e permissões (`permissao.gerenciar`) |
+| — | `PUT/DELETE /admin/positions/{id}/permissions/{permissionId}` | 🔒 admin | 204 | Concede ou retira permissão |
 
 Arquivos de avatar são servidos em `GET /files/avatars/{arquivo}` (público). O campo `avatar_url` guarda o caminho relativo.
 

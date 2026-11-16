@@ -82,6 +82,10 @@ Os testes de integração que gravam dados rodam em transação desfeita no fim 
 | RN37 CPF | `AuthIntegrationTest`, `DataModel` |
 | RN38 filtros e bairros | `SearchExamsIntegrationTest`, `BusinessRules` |
 
+## RBAC
+
+`RbacIntegrationTest` (8 testes): 401/403 da camada 1, atendente só leitura, `/me/access`, escopo por clínica (404), matriz alterada com efeito imediato e auditada, trava do Administrador, troca de cargo e seed da matriz.
+
 ## Limitação conhecida
 
 A busca por apelido soma termos: "ecografia da barriga" casa com "ecografia" (genérico, três tipos de ultrassom) e com "barriga" (específico). O resultado inclui mais exames do que o ideal. Uma melhoria futura é pontuar a especificidade e ficar só com o melhor casamento.

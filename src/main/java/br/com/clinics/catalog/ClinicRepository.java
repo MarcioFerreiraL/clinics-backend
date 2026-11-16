@@ -11,8 +11,6 @@ import org.springframework.data.jpa.repository.Query;
 
 public interface ClinicRepository extends JpaRepository<Clinic, UUID> {
 
-    Optional<Clinic> findByOwnerUserId(UUID ownerUserId);
-
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT c FROM Clinic c WHERE c.id = :id")
     Optional<Clinic> findForUpdate(UUID id);
