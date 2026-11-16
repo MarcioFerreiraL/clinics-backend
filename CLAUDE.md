@@ -8,7 +8,7 @@ API REST do Clinics, app que compara preços de exames e consultas em clínicas 
 docker compose up -d postgres      # PostgreSQL na porta 5433
 set -a && . ./.env && set +a       # carrega o .env (copie de .env.example)
 ./mvnw spring-boot:run             # API em http://localhost:8080
-./mvnw test                        # mais de 170 testes pela API (JUnit, MockMvc, Testcontainers)
+./mvnw test                        # mais de 180 testes pela API (JUnit, MockMvc, Testcontainers)
 ```
 
 Endpoints úteis: `/swagger-ui.html`, `/v3/api-docs`, `/actuator/health`.
@@ -21,6 +21,7 @@ Endpoints úteis: `/swagger-ui.html`, `/v3/api-docs`, `/actuator/health`.
 - O contrato da API (rotas, JSON `snake_case`, códigos de erro) é usado pelo app publicado: não mude sem ajustar o `clinics-mobile`.
 - O backend antigo (100 classes, em camadas) está na branch `legado` e na tag `legado-2026-10-27`.
 - Migrations no Flyway: nunca editar uma migration já aplicada, criar uma nova.
+- RBAC em duas camadas (pacote `access`): papel no `SecurityFilterChain` e permissão `recurso.ação` + escopo por clínica no `AccessService`, lidos do banco a cada requisição (não do JWT). Sem permissão é 403 `ACCESS_DENIED`; clínica fora do escopo é 404. Cargos e matriz estão na migration `V11`; `clinics.owner_user_id` não é mais usado (lotação em `internal_users`). Rota nova de servidor: chame `access.require(userId, "...")` no service. Testes em `RbacIntegrationTest`; teste que precisa de gestor insere em `internal_users` e faz login depois (o papel vai no token).
 - Autenticação JWT. Configuração por variáveis de ambiente (`PORT`, `AVATARS_DIR` etc., ver README).
 
 ## Deploy
@@ -31,6 +32,8 @@ Endpoints úteis: `/swagger-ui.html`, `/v3/api-docs`, `/actuator/health`.
 - O banco de produção roda no container `clinics-backend-postgres-1`. Nunca rodar `DROP`, `TRUNCATE` ou migration destrutiva sem confirmação.
 
 ## Cuidados
+
+- Commits curtos em português, sem trailer de coautoria. Push e merge na `main` são do Márcio, no terminal.
 
 - `.env` é segredo e não vai para o git. Não imprimir nem repetir valores dele.
 - Mudou comportamento de negócio? Atualize `docs/03-regras-de-negocio.md` e os testes correspondentes (`docs/10-testes-e-rastreabilidade.md`).

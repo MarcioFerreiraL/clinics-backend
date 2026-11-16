@@ -302,6 +302,10 @@ O banco tem **11 tabelas de domínio**: `users`, `clinics`, `clinic_operating_ho
 
 `price_history` recebe uma linha por oferta no seed e uma nova linha quando a clínica altera o preço.
 
+## 8.1 RBAC (V11)
+
+`positions` (cargo e `visibility_scope`: `all` ou `own_clinic`), `permissions` (`resource`, `action`), `position_permissions` (N:N), `internal_users` (conta → cargo → clínica; `clinic_id` nulo só para escopo `all`) e `permission_audit_logs`. `clinics.owner_user_id` não é mais usado.
+
 ## 9. Tabelas futuras
 
 `refresh_tokens`, `password_reset_tokens`, `search_history`, `consents`.
